@@ -15,3 +15,6 @@ clens
 hardware/*.bak
 hardware/*.kicad_pcb-bak
 hardware/gerber
+src/.deps/
+src/build/
+src/clens
