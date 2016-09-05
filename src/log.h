@@ -36,7 +36,7 @@ extern enum loglevel {
 #define PFAIL(...) ({PERROR(__VA_ARGS__); exit(EXIT_FAILURE);})
 #define PERROR(msg, ...) _ERR_MSG(ERROR,"[%s] " msg, strerror(errno), ## __VA_ARGS__)
 
-#define ASSERT(cond, ...) if (cond) { FAIL("Assertion failed: " _ERR_STRINGIFY(cond) " " __VA_ARGS__ ); }
+#define ASSERT(cond, ...) if (!(cond)) { FAIL("Assertion failed: " _ERR_STRINGIFY(cond) " " __VA_ARGS__ ); }
 
 #define SET_ERRNO(e) ({ errno = e; BACKTRACE("errno = %s (%d)", strerror(e), e); })
 #include <execinfo.h>

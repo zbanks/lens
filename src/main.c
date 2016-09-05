@@ -34,17 +34,21 @@ void coroutine ln_run_read_sock(int sock, int pkt_out) {
         if (raw == NULL && errno == EMSGSIZE) continue; // Too big; skip
         if (raw == NULL) goto fail;
 
+        INFO("Incoming data");
+        ln_data_fdump(raw->raw_pkt.pkt_data, stderr);
+
         struct ln_pkt * dec_pkt = ln_pkt_eth_dec(&raw->raw_pkt);
         if (dec_pkt == NULL) {
-            ln_data_fdump(raw->raw_pkt.pkt_data, stderr);
             goto fail; // Unable to decode at least ethernet
         }
 
-        //rc = chsend(pkt_out, &raw, sizeof raw, -1);
-        //if (rc < 0) goto fail;
         ln_pkt_fdumpall(dec_pkt, stderr);
         fprintf(stderr, "\n");
-        ln_pkt_decref(dec_pkt);
+
+        rc = chsend(pkt_out, &dec_pkt, sizeof dec_pkt, -1);
+        if (rc < 0) goto fail;
+
+        //ln_pkt_decref(dec_pkt);
     }
 
 fail:
@@ -61,6 +65,10 @@ void coroutine ln_run_write_sock(int sock, int pkt_in) {
         rc = chrecv(pkt_in, &pkt, sizeof pkt, -1);
         if (rc < 0) goto fail;
 
+        INFO("Outgoing data");
+        ln_pkt_fdumpall(pkt, stderr);
+        fprintf(stderr, "\n");
+
         struct ln_pkt * enc_pkt = ln_pkt_enc(pkt);
         if (enc_pkt == NULL) goto fail;
         struct ln_pkt_raw * pkt_raw = LN_PKT_CAST(enc_pkt, raw);
@@ -69,7 +77,7 @@ void coroutine ln_run_write_sock(int sock, int pkt_in) {
         ln_data_fdump(pkt_raw->raw_pkt.pkt_data, stderr);
 
         do {
-            rc = ln_pkt_raw_fsend(pkt_raw);
+            //rc = ln_pkt_raw_fsend(pkt_raw);
         } while (rc < 0 && errno == EAGAIN);
         if (rc < 0) goto fail;
 
@@ -103,8 +111,8 @@ int main(int argc, char ** argv) {
 
         // Do something with pkt here
 
-        //rc = chsend(pkt_tx, &pkt, sizeof pkt, -1);
-        //if (rc < 0) FAIL("chsend failed");
+        rc = chsend(pkt_tx, &pkt, sizeof pkt, -1);
+        if (rc < 0) FAIL("chsend failed");
     }
 
     return 0;

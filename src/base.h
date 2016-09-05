@@ -77,7 +77,7 @@ inline uint32_t ln_read32(uchar **buf, bool flip) {
 }
 
 inline void ln_write32(uchar **buf, uint32_t val, bool flip) {
-    uint32_t nval = htons(val);
+    uint32_t nval = htonl(val);
     memcpy(*buf, flip ? &nval : &val, sizeof val);
     *buf += sizeof val;
 }

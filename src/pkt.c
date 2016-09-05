@@ -11,6 +11,8 @@ struct ln_pkt_vtbl {
 static struct ln_pkt_vtbl ln_pkt_vtbl[];
 
 static struct ln_pkt_vtbl * ln_pkt_get_vtbl(struct ln_pkt * pkt) {
+    if (pkt == NULL)
+        return NULL;
     if (pkt->pkt_type <= ln_pkt_type_none || pkt->pkt_type >= ln_pkt_type_max)
         return NULL;
     return &ln_pkt_vtbl[pkt->pkt_type];
@@ -94,7 +96,7 @@ struct ln_pkt * ln_pkt_enc(struct ln_pkt * pkt) {
     if (   (pkt->pkt_data == NULL)
         || (pkt->pkt_data->data_pos - header_len < pkt->pkt_data->data_start)
         || (pkt->pkt_data->data_pos - header_len + data_len >= pkt->pkt_data->data_end)) {
-        // Ignore it and make a new one
+        // Ignore it and make a new copy containg the old data but in a bigger buffer
         data = ln_data_create(data_len);
         if (data == NULL) return NULL;
 
@@ -121,11 +123,13 @@ struct ln_pkt * ln_pkt_enc(struct ln_pkt * pkt) {
         if (pkt->pkt_parent == NULL)
             break;
 
-        ln_pkt_decref(pkt);
+        struct ln_pkt * old_pkt = pkt;
         pkt = pkt->pkt_parent;
+        ln_pkt_decref(old_pkt);
     }
 
-
+    // Finish transferring ownership of the ln_data buffer
+    pkt->pkt_data = data;
     return pkt;
 }
 
@@ -407,7 +411,7 @@ static int ln_pkt_ipv4_enc(struct ln_pkt * pkt, struct ln_data * data) {
     uint8_t b = ((ipv4->ipv4_ihl / 4) & 0xF) | 0x40;
     ln_write8(&rpos, b, LN_HTON);
     ln_write8(&rpos, ipv4->ipv4_dscp_ecn, LN_HTON);
-    ln_write16(&rpos, ln_data_len(data), LN_HTON);
+    ln_write16(&rpos, ln_data_len(data) + ipv4->ipv4_ihl, LN_HTON);
     ln_write16(&rpos, ipv4->ipv4_id, LN_HTON);
     uint16_t flags_fragoff = ((ipv4->ipv4_flags & 0x7) << 13) | (ipv4->ipv4_fragoff & 0x1FFF);
     ln_write16(&rpos, flags_fragoff, LN_HTON);
