@@ -18,26 +18,6 @@ LN_PKT_TYPES
     ln_pkt_type_max
 };
 
-/* Functions to safely convert from generic ln_pkt. Example:
- *
- * inline struct ln_pkt_eth * LN_PKT_ETH(struct ln_pkt * pkt) {
- *     if (pkt->pkt_type == LN_PKT_TYPE_ETH) {
- *         return (struct ln_pkt_eth *) pkt;
- *     return NULL;
- * }
- *
- */
-/* Removed in favor of LN_PKT_CAST(...)
-#define X(TYPE) \
-    inline LN_PKT_TYPE_STRUCT(TYPE) * LN_PKT_TYPE_NAME(TYPE)##_cast (struct ln_pkt * pkt) { \
-        if (pkt->pkt_type == LN_PKT_TYPE_NAME(TYPE)) \
-            return (LN_PKT_TYPE_STRUCT(TYPE) *) pkt; \
-        return NULL; \
-    }
-LN_PKT_TYPES
-#undef X
-*/
-
 // Safely convert from generic to ln_pkt.
 // Example usage: `struct ln_pkt_raw * my_raw = LN_PKT_CAST(my_pkt, raw);`
 #define LN_PKT_CAST(pkt, TYPE) ( \

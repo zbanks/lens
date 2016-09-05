@@ -62,61 +62,6 @@ int ln_pkt_fdumpall(struct ln_pkt * pkt, FILE * stream) {
     return sum;
 }
 
-/*
-static int ln_pkt_prep(struct ln_pkt * pkt, struct ln_chain * payload_chain) {
-    struct ln_pkt_vtbl * pkt_vtbl = ln_pkt_get_vtbl(pkt);
-    if (pkt_vtbl == NULL || pkt_vtbl->pkt_vtbl_prep == NULL)
-        return -1;
-
-    ln_chain_term(&pkt->pkt_chain)
-
-    if (pkt->pkt_parent == NULL) {
-        pkt->pkt_chain.chain_buf = ln_buf_create();
-        if (pkt->pkt_chain.chain_buf == NULL)
-            return -1;
-        pkt->pkt_chain.chain_pos = pkt->pkt_chain.chain_buf->buf_start;
-        pkt->pkt_chain.chain_last = pkt->pkt_chain.chain_pos;
-        pkt->pkt_chain.chain_next = NULL;
-    } else {
-        int rc = ln_pkt_prep(pkt->pkt_parent, &pkt->pkt_chain);
-        if (rc < 0) return rc;
-    }
-
-    ssize_t reserve_len = pkt_vtbl->pkt_vtbl_prep(pkt);
-    if (reserve_len < 0) return reserve_len;
-
-    payload_chain->chain_buf = pkt->pkt_chain.chain_buf;
-    ln_buf_incref(payload_chain->chain_buf);
-    payload_chain->chain_pos = pkt->pkt_chain.chain_pos + reserve_len;
-    payload_chain->chain_last = payload_chain->chain_pos;
-    payload_chain->chain_next = NULL;
-
-    ASSERT(pkt->pkt_chain->chain_next == NULL, "Unimplemented");
-    ASSERT(payload_chain->chain_last < LN_BUF_LAST(payload_chain->chain_buf), "Unimplemented");
-
-    return 0;
-}
-*/
-
-// Utility function
-/*
-static int ln_pkt_copy_data(struct ln_pkt * pkt, struct ln_data * payload_data) {
-    if (pkt->pkt_data == NULL)
-        return 0;
-    if (pkt->pkt_data == payload_data || payload_data == NULL)
-        return (errno = EINVAL), -1;
-
-    size_t len = pkt->pkt_data->data_last - pkt->pkt_data->data_pos;
-    if (payload_data->data_last + len >= payload_data->data_end)
-        return (errno = EMSGSIZE), -1;
-
-    memcpy(payload_data->data_last, pkt->pkt_data->data_pos, len);
-    payload_data->data_last += len;
-
-    return 0;
-}
-*/
-
 static ssize_t ln_pkt_enc_len(struct ln_pkt * pkt, size_t * header_len) {
     size_t total_len = ln_data_len(pkt->pkt_data);
     *header_len = 0;
