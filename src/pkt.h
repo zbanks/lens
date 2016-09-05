@@ -47,7 +47,7 @@ struct ln_pkt {
     // Underlying protocol/header
     struct ln_pkt * pkt_parent;
     // Payload/data
-    struct ln_chain pkt_chain;
+    struct ln_data * pkt_data;
     // Reference count
     refcnt_t pkt_refcnt;
     // Type, see LN_PKT_TYPES
@@ -58,7 +58,7 @@ void ln_pkt_decref(struct ln_pkt * pkt);
 void ln_pkt_incref(struct ln_pkt * pkt);
 int ln_pkt_fdump(struct ln_pkt * pkt, FILE * stream);
 int ln_pkt_fdumpall(struct ln_pkt * pkt, FILE * stream);
-struct ln_pkt * ln_pkt_enc(struct ln_pkt * pkt, size_t payload_len);
+struct ln_pkt * ln_pkt_enc(struct ln_pkt * pkt);
 
 //
 
@@ -74,10 +74,12 @@ int ln_pkt_raw_fsend(struct ln_pkt_raw * raw);
 
 #define LN_PROTO_ETH_PAYLOAD_LEN_MIN 46
 #define LN_PROTO_ETH_PAYLOAD_LEN_MAX 1500
-#define LN_PROTO_ETH_HEADER_LEN (6 + 6 + 2 + 4) // Does not include tag; includes CRC
+#define LN_PROTO_ETH_HEADER_LEN (6 + 6 + 2) // Does not include tag or CRC
 #define LN_PROTO_ETH_TYPE_IPV4 0x0800
 #define LN_PROTO_ETH_TYPE_ARP  0x0806
 #define LN_PROTO_ETH_TYPE_IPV6 0x86DD
+#define LN_PROTO_ETH_TYPE_TAG  0x8100
+#define LN_PROTO_ETH_TAG_NULL 0
 
 struct ln_pkt_eth {
     struct ln_pkt eth_pkt;
@@ -86,7 +88,7 @@ struct ln_pkt_eth {
     uint8_t eth_dst[6];
     uint32_t eth_tag;
     uint16_t eth_type;
-    uint32_t eth_crc;
+    //uint32_t eth_crc;
 };
 
 struct ln_pkt * ln_pkt_eth_dec(struct ln_pkt * parent_pkt);
@@ -131,7 +133,7 @@ struct ln_pkt_tcp {
     uint16_t tcp_window;
     uint16_t tcp_crc;
     uint16_t tcp_urg;
-    struct ln_chain tcp_opts_chain;
+    //struct ln_chain tcp_opts_chain;
 };
 
 struct ln_pkt * ln_pkt_tcp_dec(struct ln_pkt * parent_pkt);

@@ -35,7 +35,10 @@ void coroutine ln_run_read_sock(int sock, int pkt_out) {
         if (raw == NULL) goto fail;
 
         struct ln_pkt * dec_pkt = ln_pkt_eth_dec(&raw->raw_pkt);
-        if (dec_pkt == NULL) goto fail; // Unable to decode at least ethernet
+        if (dec_pkt == NULL) {
+            ln_data_fdump(raw->raw_pkt.pkt_data, stderr);
+            goto fail; // Unable to decode at least ethernet
+        }
 
         //rc = chsend(pkt_out, &raw, sizeof raw, -1);
         //if (rc < 0) goto fail;
@@ -58,10 +61,12 @@ void coroutine ln_run_write_sock(int sock, int pkt_in) {
         rc = chrecv(pkt_in, &pkt, sizeof pkt, -1);
         if (rc < 0) goto fail;
 
-        struct ln_pkt * enc_pkt = ln_pkt_enc(pkt, 0);
+        struct ln_pkt * enc_pkt = ln_pkt_enc(pkt);
         if (enc_pkt == NULL) goto fail;
         struct ln_pkt_raw * pkt_raw = LN_PKT_CAST(enc_pkt, raw);
         if (pkt_raw == NULL) goto fail;
+
+        ln_data_fdump(pkt_raw->raw_pkt.pkt_data, stderr);
 
         do {
             rc = ln_pkt_raw_fsend(pkt_raw);
