@@ -92,19 +92,19 @@ void ln_filter_type_register(struct ln_filter_type * filter_type) {
 //
 
 static int ln_filter_create(Agnode_t * node) {
-    const char * filter_name = agget(node, "type");
-    if (filter_name == NULL) {
-        ERROR("Filter node '%s' does not have a 'type' attribute", agnameof(node));
-        return -1;
+    const char * type_name = agget(node, "type");
+    if (type_name == NULL || type_name[0] == '\0') {
+        type_name = agnameof(node);
+        DEBUG("Using node name '%s' for type", type_name);
     }
 
     struct ln_filter_type * filter_type = ln_filter_types_head;
     for (; filter_type != NULL; filter_type = filter_type->filter_next) {
-        if (strcmp(filter_name, filter_type->filter_name) == 0)
+        if (strcmp(type_name, filter_type->filter_name) == 0)
             break;
     }
     if (filter_type == NULL) {
-        ERROR("Unknown filter type '%s' for node '%s'", filter_name, agnameof(node));
+        ERROR("Unknown filter type '%s' for node '%s'", type_name, agnameof(node));
         return -1;
     }
 
@@ -112,7 +112,7 @@ static int ln_filter_create(Agnode_t * node) {
     if (filter_type->filter_create != NULL) {
         filter_cookie = filter_type->filter_create(node);
         if (filter_cookie == NULL) {
-            ERROR("Failed to create filter type '%s' for node '%s'", filter_name, agnameof(node));
+            ERROR("Failed to create filter type '%s' for node '%s'", type_name, agnameof(node));
             return -1;
         }
     }
@@ -120,7 +120,7 @@ static int ln_filter_create(Agnode_t * node) {
     NODE_DATA(node)->filter_cookie = filter_cookie;
     NODE_DATA(node)->filter_type = filter_type;
 
-    DEBUG("Initialized filter type '%s' for node '%s'", filter_name, agnameof(node));
+    DEBUG("Initialized filter type '%s' for node '%s'", type_name, agnameof(node));
 
     return 0;
 }
@@ -141,6 +141,7 @@ static int ln_filter_perform(Agnode_t * node, struct ln_pkt * pkt) {
         WARN("Error while performing filter '%s' on node '%s'. Packet dump:",
                 NODE_DATA(node)->filter_type->filter_name, agnameof(node));
         ln_pkt_fdumpall(pkt, stderr);
+        fprintf(stderr, "\n");
     }
     return 0; // Keep going through errors for now
 }

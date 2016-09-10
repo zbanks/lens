@@ -23,6 +23,18 @@ LN_PKT_TYPES
 #define LN_PKT_CAST(pkt, TYPE) ( \
     ((pkt) != NULL && (pkt)->pkt_type == LN_PKT_TYPE_NAME(TYPE)) ? (LN_PKT_TYPE_STRUCT(TYPE) *) (pkt) : NULL)
 
+/*
+#define X(TYPE) \
+    inline LN_PKT_TYPE_STRUCT(TYPE) * ln_pkt_cast_##TYPE(struct ln_pkt * pkt) { \
+        if (pkt != NULL && pkt->pkt_type == LN_PKT_TYPE_NAME(TYPE)) \
+            return (LN_PKT_TYPE_STRUCT(TYPE) *) pkt; \
+        return NULL; \
+    }
+LN_PKT_TYPES
+#undef X
+*/
+
+
 struct ln_pkt {
     // Underlying protocol/header
     struct ln_pkt * pkt_parent;
@@ -72,6 +84,7 @@ struct ln_pkt_eth {
 };
 
 struct ln_pkt * ln_pkt_eth_dec(struct ln_pkt * parent_pkt);
+int ln_pkt_eth_parse_type(const char * type_str);
 
 //
 
@@ -99,6 +112,7 @@ struct ln_pkt_ipv4 {
 };
 
 struct ln_pkt * ln_pkt_ipv4_dec(struct ln_pkt * parent_pkt);
+int ln_pkt_ipv4_parse_proto(const char * proto_str);
 
 //
 
@@ -122,6 +136,7 @@ struct ln_pkt * ln_pkt_tcp_dec(struct ln_pkt * parent_pkt);
 //
 #define LN_PROTO_UDP_PAYLOAD_LEN_MAX ((size_t) 65535)
 #define LN_PROTO_UDP_HEADER_LEN ((size_t) 8)
+#define LN_PROTO_UDP_PORT_DNS 53
 
 struct ln_pkt_udp {
     struct ln_pkt udp_pkt;
@@ -132,3 +147,4 @@ struct ln_pkt_udp {
 };
 
 struct ln_pkt * ln_pkt_udp_dec(struct ln_pkt * parent_pkt);
+int ln_pkt_udp_parse_port(const char * port_str);

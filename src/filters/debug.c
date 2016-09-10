@@ -3,7 +3,12 @@
 // print: Print a dump of every packet that passes through
 
 int print_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
-    fprintf(stderr, "%s: ", agnameof(node));
+    const char * prefix = agget(node, "prefix");
+    if (prefix != NULL && prefix[0] != '\0')
+        fprintf(stderr, "%s: ", prefix);
+    else
+        fprintf(stderr, "Debug %s: ", agnameof(node));
+
     int len = ln_pkt_fdumpall(pkt, stderr);
     fprintf(stderr, "\n");
 

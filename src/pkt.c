@@ -1,3 +1,4 @@
+#include <strings.h>
 #include "pkt.h"
 
 struct ln_pkt_vtbl {
@@ -313,6 +314,24 @@ static int ln_pkt_eth_fdump(struct ln_pkt * pkt, FILE * stream) {
                     eth->eth_type);
 }
 
+int ln_pkt_eth_parse_type(const char * type_str) {
+    if (type_str == NULL)
+        return -1;
+    if (type_str[0] == '\0')
+        return -1;
+    if (strcasecmp(type_str, "arp") == 0)
+        return LN_PROTO_ETH_TYPE_ARP;
+    if (strcasecmp(type_str, "ipv4") == 0)
+        return LN_PROTO_ETH_TYPE_IPV4;
+    if (strcasecmp(type_str, "ipv6") == 0)
+        return LN_PROTO_ETH_TYPE_IPV6;
+    errno = 0;
+    int type = strtol(type_str, NULL, 0);
+    if (errno != 0)
+        return -1;
+    return type;
+}
+
 
 // struct ln_pkt_ipv4
 
@@ -451,6 +470,24 @@ int ln_pkt_ipv4_fdump(struct ln_pkt * pkt, FILE * stream) {
                     ipv4->ipv4_proto);
 }
 
+int ln_pkt_ipv4_parse_proto(const char * proto_str) {
+    if (proto_str == NULL)
+        return -1;
+    if (proto_str[0] == '\0')
+        return -1;
+    if (strcasecmp(proto_str, "ICMP") == 0)
+        return LN_PROTO_IPV4_PROTO_ICMP;
+    if (strcasecmp(proto_str, "TCP") == 0)
+        return LN_PROTO_IPV4_PROTO_TCP;
+    if (strcasecmp(proto_str, "UDP") == 0)
+        return LN_PROTO_IPV4_PROTO_UDP;
+    errno = 0;
+    int proto = strtol(proto_str, NULL, 0);
+    if (errno != 0)
+        return -1;
+    return proto;
+}
+
 // struct ln_pkt_udp
 
 struct ln_pkt * ln_pkt_udp_dec(struct ln_pkt * parent_pkt) {
@@ -533,6 +570,20 @@ int ln_pkt_udp_fdump(struct ln_pkt * pkt, FILE * stream) {
                     ln_data_len(udp->udp_pkt.pkt_data),
                     udp->udp_src,
                     udp->udp_dst);
+}
+
+int ln_pkt_udp_parse_port(const char * port_str) {
+    if (port_str == NULL)
+        return -1;
+    if (port_str[0] == '\0')
+        return -1;
+    if (strcasecmp(port_str, "dns") == 0)
+        return LN_PROTO_UDP_PORT_DNS;
+    errno = 0;
+    int port = strtol(port_str, NULL, 10);
+    if (errno != 0)
+        return -1;
+    return port;
 }
 
 // vtable setup
