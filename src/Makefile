@@ -4,6 +4,7 @@ TARGET = clens
 # Source files
 C_SRC  = $(wildcard *.c)
 C_SRC += $(wildcard filters/*.c)
+C_SRC += $(wildcard pkts/*.c)
 
 OBJDIR = build
 $(shell mkdir -p $(OBJDIR) >/dev/null)

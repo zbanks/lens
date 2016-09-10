@@ -7,6 +7,8 @@
 #include "base.h"
 #include "filter.h"
 #include "libdill/libdill.h"
+#include "pkts/lowlevel.h"
+#include "pkts/udp.h"
 
 /* TODO
  * ====

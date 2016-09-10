@@ -1,4 +1,6 @@
 #include "filter.h"
+#include "pkts/lowlevel.h"
+#include "pkts/udp.h"
 
 // eth_dec: Decode Ethernet header from a raw packet
 int eth_dec_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
