@@ -1,8 +1,9 @@
 TARGET = clens
-CC = gcc
+#CC = gcc
 
 # Source files
 C_SRC  = $(wildcard *.c)
+C_SRC += $(wildcard filters/*.c)
 
 OBJDIR = build
 $(shell mkdir -p $(OBJDIR) >/dev/null)
@@ -15,7 +16,7 @@ CFLAGS = -std=gnu99 -ggdb3 -Og
 CFLAGS += $(INC)
 CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter
 CFLAGS += -D_POSIX_C_SOURCE=20160619
-LFLAGS = -L libdill/.libs -ldill
+LFLAGS = -L /usr/lib -lcgraph
 
 # File dependency generation
 DEPDIR = .deps
@@ -28,7 +29,7 @@ $(DEPDIR)/%.d : %.c .deps
 
 # Targets
 $(TARGET): $(OBJECTS) libdill/.libs/libdill.a
-	$(CC) $(CFLAGS) $(LFLAGS) -o $@ $+
+	$(CC) $(CFLAGS) -o $@ $+ $(LFLAGS)
 
 $(OBJDIR)/%.o: %.c
 	@mkdir -p $(dir $@)

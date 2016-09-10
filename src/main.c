@@ -5,6 +5,7 @@
 
 #include "pkt.h"
 #include "base.h"
+#include "filter.h"
 #include "libdill/libdill.h"
 
 /* TODO
@@ -34,21 +35,8 @@ void coroutine ln_run_read_sock(int sock, int pkt_out) {
         if (raw == NULL && errno == EMSGSIZE) continue; // Too big; skip
         if (raw == NULL) goto fail;
 
-        INFO("Incoming data");
-        ln_data_fdump(raw->raw_pkt.pkt_data, stderr);
-
-        struct ln_pkt * dec_pkt = ln_pkt_eth_dec(&raw->raw_pkt);
-        if (dec_pkt == NULL) {
-            goto fail; // Unable to decode at least ethernet
-        }
-
-        ln_pkt_fdumpall(dec_pkt, stderr);
-        fprintf(stderr, "\n");
-
-        rc = chsend(pkt_out, &dec_pkt, sizeof dec_pkt, -1);
+        rc = chsend(pkt_out, &raw, sizeof raw, -1);
         if (rc < 0) goto fail;
-
-        //ln_pkt_decref(dec_pkt);
     }
 
 fail:
@@ -65,23 +53,17 @@ void coroutine ln_run_write_sock(int sock, int pkt_in) {
         rc = chrecv(pkt_in, &pkt, sizeof pkt, -1);
         if (rc < 0) goto fail;
 
-        INFO("Outgoing data");
-        ln_pkt_fdumpall(pkt, stderr);
-        fprintf(stderr, "\n");
-
         struct ln_pkt * enc_pkt = ln_pkt_enc(pkt);
         if (enc_pkt == NULL) goto fail;
         struct ln_pkt_raw * pkt_raw = LN_PKT_CAST(enc_pkt, raw);
         if (pkt_raw == NULL) goto fail;
-
-        ln_data_fdump(pkt_raw->raw_pkt.pkt_data, stderr);
+        ln_pkt_decref(pkt);
 
         do {
             //rc = ln_pkt_raw_fsend(pkt_raw);
+            rc = 0;
         } while (rc < 0 && errno == EAGAIN);
         if (rc < 0) goto fail;
-
-        ln_pkt_decref(pkt);
     }
 
 fail:
@@ -90,30 +72,29 @@ fail:
 }
 
 int main(int argc, char ** argv) {
+    const char * filename = "lens.dot";
+
+    // Load filter graph
+    FILE * f = fopen(filename, "r");
+    if (f == NULL) PFAIL("Unable to open file '%s' for reading", filename);
+
+    struct ln_graph * graph = ln_graph_load(f);
+    if (graph == NULL) PFAIL("Unable to load graph from file '%s'", filename);
+
+    if (fclose(f) < 0) PFAIL("Unable to close file '%s'", filename);
+
     int raw_sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (raw_sock < 0) PFAIL("Unable to open socket");
 
     //int ctl = channel(1, 1);
     //if (ctl < 0) PFAIL("Unable to create control channel");
 
-    int pkt_rx = channel(sizeof(struct ln_pkt_pkt *), 16);
-    if (pkt_rx < 0) PFAIL("Unable to open pkt_rx channel");
-    int pkt_tx = channel(sizeof(struct ln_pkt_pkt *), 16);
-    if (pkt_tx < 0) PFAIL("Unable to open pkt_tx channel");
+    go(ln_run_read_sock(raw_sock, graph->graph_input));
+    go(ln_run_write_sock(raw_sock, graph->graph_output));
+    go(ln_filter_run(128));
+    //go(ln_graph_run(graph));
 
-    go(ln_run_read_sock(raw_sock, pkt_rx));
-    go(ln_run_write_sock(raw_sock, pkt_tx));
-
-    while(1) {
-        struct ln_pkt * pkt = NULL;
-        int rc = chrecv(pkt_rx, &pkt, sizeof pkt, -1);
-        if (rc < 0) FAIL("chrecv failed");
-
-        // Do something with pkt here
-
-        rc = chsend(pkt_tx, &pkt, sizeof pkt, -1);
-        if (rc < 0) FAIL("chsend failed");
-    }
+    ln_graph_run(graph);
 
     return 0;
 }

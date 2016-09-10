@@ -240,6 +240,7 @@ struct ln_pkt * ln_pkt_eth_dec(struct ln_pkt * parent_pkt) {
     eth->eth_pkt.pkt_parent = parent_pkt;
     ln_pkt_incref(parent_pkt);
 
+    /*
     // Higher-level decode
     struct ln_pkt * ret_pkt = &eth->eth_pkt;
     switch (eth->eth_type) {
@@ -254,8 +255,9 @@ struct ln_pkt * ln_pkt_eth_dec(struct ln_pkt * parent_pkt) {
         INFO("Unknown ethertype %#04x", eth->eth_type);
         break;
     }
+    */
 
-    return ret_pkt;
+    return &eth->eth_pkt;
 }
 
 static int ln_pkt_eth_len(struct ln_pkt * pkt, size_t * header_len, size_t * footer_len) {
@@ -366,6 +368,7 @@ struct ln_pkt * ln_pkt_ipv4_dec(struct ln_pkt * parent_pkt) {
     ipv4->ipv4_pkt.pkt_parent = parent_pkt;
     ln_pkt_incref(parent_pkt);
 
+    /*
     // Higher-level decode
     struct ln_pkt * ret_pkt = &ipv4->ipv4_pkt;
     switch (ipv4->ipv4_proto) {
@@ -380,8 +383,9 @@ struct ln_pkt * ln_pkt_ipv4_dec(struct ln_pkt * parent_pkt) {
         INFO("Unknown IP proto %#02x", ipv4->ipv4_proto);
         break;
     }
+    */
 
-    return ret_pkt;
+    return &ipv4->ipv4_pkt;
 
 fail:
     free(ipv4);
@@ -484,9 +488,7 @@ struct ln_pkt * ln_pkt_udp_dec(struct ln_pkt * parent_pkt) {
     udp->udp_pkt.pkt_parent = parent_pkt;
     ln_pkt_incref(parent_pkt);
 
-    // Higher-level decode: TODO
-    struct ln_pkt * ret_pkt = &udp->udp_pkt;
-    return ret_pkt;
+    return &udp->udp_pkt;
 
 fail:
     free(udp);

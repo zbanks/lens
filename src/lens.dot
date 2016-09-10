@@ -1,0 +1,11 @@
+digraph {
+    input;
+    eth_dec [type=eth_dec];
+    ipv4_dec [type=ipv4_dec];
+    print1 [type=print];
+    print2 [type=print];
+    print3 [type=print prefix=result];
+    output [type=output];
+
+    input -> print1 -> eth_dec -> print2 -> ipv4_dec -> print3 -> output;
+}
