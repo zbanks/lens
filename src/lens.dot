@@ -7,6 +7,7 @@ digraph {
     input -> eth_dec;
     eth_dec -> ipv4_dec [ethertype=ipv4];
     ipv4_dec -> udp_dec [proto=udp];
-    udp_dec -> print_dns [port=53];
-    udp_dec -> print_udp ;
+    udp_dec -> dns_dec [port=53];
+    dns_dec -> print_dns;
+    udp_dec -> print_udp [unmatched=1];
 }

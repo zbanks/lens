@@ -6,20 +6,14 @@
 
 // Safely convert from generic to ln_pkt.
 // Example usage: `struct ln_pkt_raw * my_raw = LN_PKT_CAST(my_pkt, raw);`
-#define LN_PKT_CAST(pkt, TYPE) ( \
-    ((pkt) != NULL && (pkt)->pkt_type == LN_PKT_TYPE_NAME(TYPE)) ? (LN_PKT_TYPE_STRUCT(TYPE) *) (pkt) : NULL)
+#define LN_PKT_CAST(pkt, TYPE) ({ \
+        struct ln_pkt * _pkt = (pkt); \
+        if (_pkt != NULL && _pkt->pkt_type != LN_PKT_TYPE_NAME(TYPE)) \
+            _pkt = NULL; \
+        (LN_PKT_TYPE_STRUCT(TYPE) *) _pkt; })
 
-/*
-#define X(TYPE) \
-    inline LN_PKT_TYPE_STRUCT(TYPE) * ln_pkt_cast_##TYPE(struct ln_pkt * pkt) { \
-        if (pkt != NULL && pkt->pkt_type == LN_PKT_TYPE_NAME(TYPE)) \
-            return (LN_PKT_TYPE_STRUCT(TYPE) *) pkt; \
-        return NULL; \
-    }
-LN_PKT_TYPES
-#undef X
-*/
-
+// Decode & cast 
+#define LN_PKT_DEC(pkt, TYPE) LN_PKT_CAST(LN_PKT_TYPE_NAME(TYPE)->pkt_type_dec((pkt)), TYPE)
 
 struct ln_pkt_type {
     struct ln_pkt * (*pkt_type_dec)(struct ln_pkt * parent_pkt);

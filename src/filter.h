@@ -16,6 +16,7 @@ struct ln_graph {
 
     // Dill channels, each taking (struct ln_pkt *) s
     // chsend() into graph_input; chrecv() from graph_output
+    // TODO: Multiple inputs/outputs
     int graph_input;
     int graph_output;
 };
@@ -53,7 +54,8 @@ void ln_filter_type_register(struct ln_filter_type * filter_type);
         .filter_create = NULL, \
         .filter_destroy = NULL, \
         .filter_perform = NAME##_perform, \
-    }
+    }; \
+    LN_FILTER_TYPE_REGISTER(NAME);
 
 #define LN_FILTER_TYPE_DECLARE(NAME) \
     static struct ln_filter_type NAME = \
@@ -63,6 +65,12 @@ void ln_filter_type_register(struct ln_filter_type * filter_type);
         .filter_create = NAME##_create, \
         .filter_destroy = NAME##_destroy, \
         .filter_perform = NAME##_perform, \
+    }; \
+    LN_FILTER_TYPE_REGISTER(NAME);
+
+#define LN_FILTER_TYPE_REGISTER(NAME) \
+    LN_ATTRIBUTE_CONSTRUCTOR static void _init_type_##NAME () { \
+        ln_filter_type_register(&NAME); \
     }
 
 // Filter Utils

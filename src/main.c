@@ -10,18 +10,6 @@
 #include "pkts/lowlevel.h"
 #include "pkts/udp.h"
 
-/* TODO
- * ====
- *
- * - Handle coroutine crashes
- *   - Maybe they should just crash the whole program?
- *   - Is there a way to detect this & restart the coro?
- * - Bidirectional data flow
- *   - Channel pairs? (They could also be typed?)
- * - Channel type information / safety
- *   - Enforced once; but it's OK to do it at the start of the coros
- */
-
 enum loglevel loglevel = LOGLEVEL_INFO;
 
 void coroutine ln_run_read_sock(int sock, int pkt_out) {
@@ -88,15 +76,12 @@ int main(int argc, char ** argv) {
     int raw_sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (raw_sock < 0) PFAIL("Unable to open socket");
 
-    //int ctl = channel(1, 1);
-    //if (ctl < 0) PFAIL("Unable to create control channel");
-
     go(ln_run_read_sock(raw_sock, graph->graph_input));
     go(ln_run_write_sock(raw_sock, graph->graph_output));
     go(ln_filter_run(128));
-    //go(ln_graph_run(graph));
+    go(ln_graph_run(graph));
 
-    ln_graph_run(graph);
+    msleep(-1);
 
     return 0;
 }

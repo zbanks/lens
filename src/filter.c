@@ -85,6 +85,10 @@ void coroutine ln_graph_run(struct ln_graph * graph) {
 static struct ln_filter_type * ln_filter_types_head = NULL;
 
 void ln_filter_type_register(struct ln_filter_type * filter_type) {
+    // This doesn't catch all errors; just the most common
+    if (ln_filter_types_head == filter_type)
+        FAIL("Duplicate filter type '%s' registered", filter_type->filter_name);
+
     filter_type->filter_next = ln_filter_types_head;
     ln_filter_types_head = filter_type;
 }
@@ -197,9 +201,4 @@ int output_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
     ln_pkt_incref(pkt);
     return chsend(graph_data->graph_output, &pkt, sizeof pkt, -1);
 }
-LN_FILTER_TYPE_DECLARE_STATELESS(output);
-
-LN_ATTRIBUTE_CONSTRUCTOR
-static void init() {
-    ln_filter_type_register(&output);
-}
+LN_FILTER_TYPE_DECLARE_STATELESS(output)

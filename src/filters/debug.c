@@ -19,9 +19,4 @@ int print_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
 
     return rc;
 }
-LN_FILTER_TYPE_DECLARE_STATELESS(print);
-
-LN_ATTRIBUTE_CONSTRUCTOR
-static void init() {
-    ln_filter_type_register(&print);
-}
+LN_FILTER_TYPE_DECLARE_STATELESS(print)
