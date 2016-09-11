@@ -46,10 +46,7 @@ int udp_dec_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
     Agedge_t * unmatched = NULL;
 
     for (AG_EACH_EDGEOUT(node, edge)) {
-        const char * unmatched_str = agget(edge, "unmatched");
-        if (unmatched_str != NULL && unmatched_str[0] != '\0') {
-            if (unmatched != NULL)
-                WARN("Multiple 'unmatched' edges on node '%s'", agnameof(node));
+        if (ln_ag_attr_bool(edge, "unmatched", false)) {
             unmatched = edge;
             continue;
         }

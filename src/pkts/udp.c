@@ -7,7 +7,7 @@ struct ln_pkt * ln_pkt_udp_dec(struct ln_pkt * parent_pkt) {
 
     if (data->data_next != NULL) // Unsupported
         return SET_ERRNO(EINVAL), NULL;
-    if (data->data_pos + LN_PROTO_UDP_HEADER_LEN >= data->data_last)
+    if (data->data_pos + LN_PROTO_UDP_HEADER_LEN > data->data_last)
         return SET_ERRNO(EMSGSIZE), NULL;
 
     struct ln_pkt_udp * udp = calloc(1, sizeof *udp);

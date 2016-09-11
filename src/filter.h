@@ -29,6 +29,9 @@ void ln_graph_run(struct ln_graph * graph);
     edge != NULL; \
     edge = agnxtout(agraphof(node), edge)
 
+bool ln_ag_attr_bool(void * agobj, char * attr, bool def);
+int ln_ag_attr_int(void * agobj, char * attr, int def);
+
 // Filter Types
 
 struct ln_filter_type;
@@ -43,7 +46,6 @@ struct ln_filter_type {
 
 void ln_filter_type_register(struct ln_filter_type * filter_type);
 
-#define LN_ATTRIBUTE_CONSTRUCTOR __attribute__ ((constructor))
 #define LN_FILTER_EMPTY_COOKIE ((void *) 1)
 
 #define LN_FILTER_TYPE_DECLARE_STATELESS(NAME) \

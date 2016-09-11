@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <arpa/inet.h>
 
 #include "log.h"
@@ -81,3 +82,8 @@ inline void ln_write32(uchar **buf, uint32_t val, bool flip) {
     memcpy(*buf, flip ? &nval : &val, sizeof val);
     *buf += sizeof val;
 }
+
+// Compiler things
+
+#define LN_ATTRIBUTE_CONSTRUCTOR __attribute__ ((constructor))
+#define LN_ATTRIBUTE_PACKED __attribute__ ((packed))

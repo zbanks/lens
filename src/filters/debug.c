@@ -9,7 +9,11 @@ int print_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
     else
         fprintf(stderr, "Debug %s: ", agnameof(node));
 
-    int len = ln_pkt_fdumpall(pkt, stderr);
+    int len = 0;
+    if (ln_ag_attr_bool(node, "all", true))
+        len = ln_pkt_fdumpall(pkt, stderr);
+    else
+        len = ln_pkt_fdump(pkt, stderr);
     fprintf(stderr, "\n");
 
     int rc = len < 0 ? -1 : 0;

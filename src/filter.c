@@ -80,6 +80,40 @@ void coroutine ln_graph_run(struct ln_graph * graph) {
     }
 }
 
+bool ln_ag_attr_bool(void * agobj, char * attr, bool def) {
+    const char * val = agget(agobj, attr);
+    if (val == NULL || *val == '\0')
+        return def;
+    if (strcasecmp(val, "0") == 0
+     || strcasecmp(val, "n") == 0
+     || strcasecmp(val, "no") == 0
+     || strcasecmp(val, "f") == 0
+     || strcasecmp(val, "false") == 0)
+        return false;
+    if (strcasecmp(val, "1") == 0
+     || strcasecmp(val, "y") == 0
+     || strcasecmp(val, "yes") == 0
+     || strcasecmp(val, "t") == 0
+     || strcasecmp(val, "true") == 0)
+        return true;
+
+    WARN("Invalid bool attribute %s='%s' for %s; using default", attr, val, agnameof(agobj));
+    return def;
+}
+
+int ln_ag_attr_int(void * agobj, char * attr, int def) {
+    const char * val = agget(agobj, attr);
+    if (val == NULL || *val == '\0')
+        return def;
+    errno = 0;
+    int result = strtol(val, NULL, 0);
+    if (errno == 0)
+        return result;
+
+    WARN("Invalid int attribute %s='%s' for %s; using default", attr, val, agnameof(agobj));
+    return def;
+}
+
 //
 
 static struct ln_filter_type * ln_filter_types_head = NULL;
