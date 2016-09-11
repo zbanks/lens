@@ -29,7 +29,7 @@ struct ln_pkt_type {
         .pkt_type_len       = ln_pkt_##TYPE##_len, \
         .pkt_type_enc       = ln_pkt_##TYPE##_enc, \
         .pkt_type_fdump     = ln_pkt_##TYPE##_fdump, \
-        .pkt_type_term      = NULL, \
+        .pkt_type_term      = ln_pkt_##TYPE##_term, \
     }, \
     * LN_PKT_TYPE_NAME(TYPE) = &LN_PKT_TYPE_NAME(TYPE##_)
 

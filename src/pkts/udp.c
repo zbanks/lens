@@ -97,4 +97,5 @@ int ln_pkt_udp_parse_port(const char * port_str) {
     return port;
 }
 
+#define ln_pkt_udp_term NULL
 LN_PKT_TYPE_DECLARE(udp);

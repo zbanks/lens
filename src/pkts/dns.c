@@ -22,16 +22,45 @@ struct ln_pkt * ln_pkt_dns_dec(struct ln_pkt * parent_pkt) {
 
     dns->dns_opcode = (dns->dns_flags & LN_PROTO_DNS_FLAGS_OPCODE_MASK) >> LN_PROTO_DNS_FLAGS_OPCODE_OFFSET;
     dns->dns_rcode = (dns->dns_flags & LN_PROTO_DNS_FLAGS_RCODE_MASK) >> LN_PROTO_DNS_FLAGS_RCODE_OFFSET;
-    
+
+    dns->dns_qs = calloc(dns->dns_qdc, sizeof *dns->dns_qs);
+    if (dns->dns_qs == NULL) MEMFAIL();
+    dns->dns_rrs = calloc(dns->dns_anc + dns->dns_nsc + dns->dns_arc, sizeof *dns->dns_rrs);
+    if (dns->dns_rrs == NULL) MEMFAIL();
+
     data->data_pos = rpos;
     dns->dns_pkt.pkt_data = data;
     parent_pkt->pkt_data = NULL;
+
+    for (size_t i = 0; i < dns->dns_qdc; i++) {
+        uchar len = *rpos;
+        if (len > 63) WARN("Long len in fqdn: %u", len);
+        dns->dns_qs[i].q_name = ++rpos;
+        while (len) {
+            rpos += len;
+            len = *rpos;
+            if (len != 0) *rpos++ = '.';
+        }
+        while ((uintptr_t) rpos & 0x1) rpos++;
+        dns->dns_qs[i].q_type = ln_read16(&rpos, LN_NTOH);
+        dns->dns_qs[i].q_class = ln_read16(&rpos, LN_NTOH);
+    }
 
     dns->dns_pkt.pkt_type = ln_pkt_type_dns;
     dns->dns_pkt.pkt_parent = parent_pkt;
     ln_pkt_incref(parent_pkt);
 
     return &dns->dns_pkt;
+}
+
+static void ln_pkt_dns_term(struct ln_pkt * pkt) {
+    struct ln_pkt_dns * dns = LN_PKT_CAST(pkt, dns);
+    if (dns == NULL) {
+        SET_ERRNO(EINVAL);
+        return;
+    }
+    free(dns->dns_qs);
+    free(dns->dns_rrs);
 }
 
 static int ln_pkt_dns_len(struct ln_pkt * pkt, size_t * header_len, size_t * footer_len) {
@@ -105,18 +134,26 @@ LN_PROTO_DNS_RCODES;
 int ln_pkt_dns_fdump(struct ln_pkt * pkt, FILE * stream) {
     struct ln_pkt_dns * dns = LN_PKT_CAST(pkt, dns);
     if (dns == NULL) return SET_ERRNO(EINVAL), -1;
-    return fprintf(stream, "[dns"
-                           " len=%zu"
-                           " id=%hu"
-                           " flags=%s"
-                           " opcode=%s"
-                           " rcode=%s"
-                           "]",
+    int rc = fprintf(stream, "[dns"
+                             " len=%zu"
+                             " id=%hu"
+                             " flags=%s"
+                             " opcode=%s"
+                             " rcode=%s",
                     ln_data_len(dns->dns_pkt.pkt_data),
                     dns->dns_id,
                     ln_pkt_dns_str_flags(dns),
                     ln_pkt_dns_str_opcode(dns),
                     ln_pkt_dns_str_rcode(dns));
+    for (uint16_t i = 0; i < dns->dns_qdc; i++) {
+        rc += fprintf(stream, " q_%hu=[name=%s type=%hu class=%hx]",
+                        i,
+                        dns->dns_qs[i].q_name,
+                        dns->dns_qs[i].q_type,
+                        dns->dns_qs[i].q_class);
+    }
+    rc += fprintf(stream, "]");
+    return rc;
 }
 
 int ln_pkt_dns_parse_type(const char * type_str) {

@@ -68,6 +68,7 @@ int ln_pkt_raw_fdump(struct ln_pkt * pkt, FILE * stream) {
                     raw->raw_fd);
 }
 
+#define ln_pkt_raw_term NULL
 LN_PKT_TYPE_DECLARE(raw);
 
 // struct ln_pkt_eth
@@ -202,6 +203,7 @@ int ln_pkt_eth_parse_type(const char * type_str) {
     return type;
 }
 
+#define ln_pkt_eth_term NULL
 LN_PKT_TYPE_DECLARE(eth);
 
 // struct ln_pkt_ipv4
@@ -246,8 +248,11 @@ struct ln_pkt * ln_pkt_ipv4_dec(struct ln_pkt * parent_pkt) {
     // Check packet size
     if (eth_len < len)
         goto fail;
-    if (eth_len > len)
+    if (eth_len > len) {
         INFO("Extra bytes: %zu", eth_len - len);
+        //fhexdump(stderr, data->data_start, data->data_last - data->data_start);
+        //fprintf(stderr, "\n");
+    }
 
     data->data_pos = rpos;
     data->data_last = rpos + len - ipv4->ipv4_ihl;
@@ -359,4 +364,5 @@ int ln_pkt_ipv4_parse_proto(const char * proto_str) {
     return proto;
 }
 
+#define ln_pkt_ipv4_term NULL
 LN_PKT_TYPE_DECLARE(ipv4);

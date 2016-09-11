@@ -1,5 +1,6 @@
 digraph {
     input;
+    print_ipv4 [type=print prefix=IPV4];
     print_dns [type=print prefix=DNS];
     print_udp [type=print prefix=UDP];
     output [type=output];
@@ -8,6 +9,9 @@ digraph {
     eth_dec -> ipv4_dec [ethertype=ipv4];
     ipv4_dec -> udp_dec [proto=udp];
     udp_dec -> dns_dec [port=53];
+    ipv4_dec -> print_ipv4;
+    /*
     dns_dec -> print_dns;
     udp_dec -> print_udp [unmatched=1];
+    */
 }

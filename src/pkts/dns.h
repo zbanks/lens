@@ -84,6 +84,20 @@ struct ln_pkt_dns {
     uint16_t dns_nsc; // Name Server count
     uint16_t dns_arc; // Additional Record count
 
+    struct ln_pkt_dns_q {
+        const uchar * q_name;
+        uint16_t q_type;
+        uint16_t q_class;
+    } * dns_qs;
+
+    struct ln_pkt_dns_rr {
+        const uchar * rr_name;
+        uint16_t rr_type;
+        uint16_t rr_class;
+        uint32_t rr_ttl;
+        uint16_t rr_rdlength;
+        const uchar * rr_rdata;
+    } * dns_rrs;
 };
 
 extern struct ln_pkt_type * ln_pkt_type_dns;
