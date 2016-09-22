@@ -1,6 +1,18 @@
 #include "pkts/dns.h"
 #include <strings.h>
 
+LN_PROTO_DNS_TYPE_GEN(LN_MAP_ENUM_PRINT_DEFINE);
+LN_PROTO_DNS_TYPE_GEN(LN_MAP_ENUM_SCAN_DEFINE);
+
+LN_PROTO_DNS_FLAG_GEN(LN_MAP_ENUM_BITMAP_PRINT_DEFINE);
+LN_PROTO_DNS_FLAG_GEN(LN_MAP_ENUM_SCAN_DEFINE);
+
+LN_PROTO_DNS_OPCODE_GEN(LN_MAP_ENUM_PRINT_DEFINE);
+LN_PROTO_DNS_OPCODE_GEN(LN_MAP_ENUM_SCAN_DEFINE);
+
+LN_PROTO_DNS_RCODE_GEN(LN_MAP_ENUM_PRINT_DEFINE);
+LN_PROTO_DNS_RCODE_GEN(LN_MAP_ENUM_SCAN_DEFINE);
+
 struct ln_pkt * ln_pkt_dns_dec(struct ln_pkt * parent_pkt) {
     struct ln_data * data = parent_pkt->pkt_data;
     uchar * rpos = data->data_pos;
@@ -76,61 +88,6 @@ static int ln_pkt_dns_enc(struct ln_pkt * pkt, struct ln_data * data) {
     return -1; // TODO
 }
 
-/*
-static const char * ln_pkt_dns_str_type(struct ln_pkt_dns * dns) {
-    switch(dns->dns_type) {
-#define X(NAME, VALUE) \
-    case LN_PROTO_DNS_TYPE_##NAME: \
-        return #NAME;
-LN_PROTO_DNS_TYPES;
-#undef X
-    default:
-        return "???";
-    }
-}
-*/
-
-static const char * ln_pkt_dns_str_flags(struct ln_pkt_dns * dns) {
-    static char str[128];
-    char * ptr = str;
-    uint16_t flags = dns->dns_flags;
-
-#define X(NAME, VALUE) \
-    if (flags & LN_PROTO_DNS_FLAG_##NAME) { \
-        *ptr++ = #NAME[0]; \
-        if(#NAME[1]) *ptr++ = #NAME[1]; \
-        *ptr++ = '|'; \
-    }
-LN_PROTO_DNS_FLAGS
-#undef X
-    *--ptr = '\0';
-    return str;
-}
-
-static const char * ln_pkt_dns_str_opcode(struct ln_pkt_dns * dns) {
-    switch(dns->dns_opcode) {
-#define X(NAME, VALUE) \
-    case LN_PROTO_DNS_OPCODE_##NAME: \
-        return #NAME;
-LN_PROTO_DNS_OPCODES;
-#undef X
-    default:
-        return "???";
-    }
-}
-
-static const char * ln_pkt_dns_str_rcode(struct ln_pkt_dns * dns) {
-    switch(dns->dns_rcode) {
-#define X(NAME, VALUE) \
-    case LN_PROTO_DNS_RCODE_##NAME: \
-        return #NAME;
-LN_PROTO_DNS_RCODES;
-#undef X
-    default:
-        return "???";
-    }
-}
-
 int ln_pkt_dns_fdump(struct ln_pkt * pkt, FILE * stream) {
     struct ln_pkt_dns * dns = LN_PKT_CAST(pkt, dns);
     if (dns == NULL) return SET_ERRNO(EINVAL), -1;
@@ -142,9 +99,9 @@ int ln_pkt_dns_fdump(struct ln_pkt * pkt, FILE * stream) {
                              " rcode=%s",
                     ln_data_len(dns->dns_pkt.pkt_data),
                     dns->dns_id,
-                    ln_pkt_dns_str_flags(dns),
-                    ln_pkt_dns_str_opcode(dns),
-                    ln_pkt_dns_str_rcode(dns));
+                    ln_proto_dns_type_print(dns->dns_flags),
+                    ln_proto_dns_opcode_print(dns->dns_opcode),
+                    ln_proto_dns_rcode_print(dns->dns_rcode));
     for (uint16_t i = 0; i < dns->dns_qdc; i++) {
         rc += fprintf(stream, " q_%hu=[name=%s type=%hu class=%hx]",
                         i,
@@ -154,22 +111,6 @@ int ln_pkt_dns_fdump(struct ln_pkt * pkt, FILE * stream) {
     }
     rc += fprintf(stream, "]");
     return rc;
-}
-
-int ln_pkt_dns_parse_type(const char * type_str) {
-    if (type_str == NULL)
-        return -1;
-    if (type_str[0] == '\0')
-        return -1;
-#define X(NAME, VALUE) if (strcasecmp(type_str, #NAME) == 0) return LN_PROTO_DNS_TYPE_##NAME;
-LN_PROTO_DNS_TYPES
-#undef X
-
-    errno = 0;
-    int type = strtol(type_str, NULL, 0);
-    if (errno != 0)
-        return -1;
-    return type;
 }
 
 LN_PKT_TYPE_DECLARE(dns);

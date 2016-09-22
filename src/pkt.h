@@ -1,5 +1,6 @@
 #pragma once
 #include "base.h"
+#include "util.h"
 
 #define LN_PKT_TYPE_STRUCT(TYPE) struct ln_pkt_##TYPE
 #define LN_PKT_TYPE_NAME(TYPE) ln_pkt_type_##TYPE

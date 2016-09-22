@@ -2,6 +2,25 @@
 #include "pkts/lowlevel.h"
 #include "pkts/tcp.h"
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+/* 
+Generate state transition diagram
+---------------------------------
+
+echo 'digraph tcp_states {' > tcp_states.dot
+grep -o 'TCP_[A-Z0-9_]*,' tcp.c | tr ',' ';' >> tcp_states.dot
+echo '{ edge [color=blue];' >> tcp_states.dot
+grep '#src\:' tcp.c | cut -f2 -d: >> tcp_states.dot
+echo '} { edge [color=red];' >> tcp_states.dot
+grep '#dst\:' tcp.c | cut -f2 -d: >> tcp_states.dot
+echo '}}' >> tcp_states.dot
+dot -O -Tpng tcp_states.dot
+
+open tcp_states.dot.png
+
+*/
+
 struct tcp_conn_manager {
     struct tcp_conn * conn_head;
 };
@@ -11,12 +30,77 @@ struct tcp_conn_key {
     uchar key_cli[34];
 };
 
+struct tcp_buffer {
+    struct tcp_unacked * next;
+    struct tcp_unacked * prev;
+    uint64_t timestamp;
+    struct ln_pkt_tcp * tcp_pkt;
+};
+
+#define SERVER 0
+#define CLIENT 1
 struct tcp_conn {
     struct tcp_conn * conn_next;
     struct tcp_conn_key conn_key;
+
+    Agedge_t * conn_out;
+
+    struct tcp_party {
+        struct ln_pkt * party_base_pkt;
+
+        Agedge_t * party_out;
+
+        size_t party_pkt_count;
+        enum tcp_state {
+            TCP_UNINITIALIZED = 0,
+            TCP_RESET,
+            TCP_LISTEN,
+            TCP_SYN_SENT,
+            TCP_SYN_RECEIVED,
+            TCP_ESTABLISHED,
+            TCP_FIN_WAIT_1,
+            TCP_FIN_WAIT_2,
+            TCP_CLOSE_WAIT,
+            TCP_LAST_ACK,
+            TCP_TIME_WAIT,
+            TCP_CLOSED,
+        } party_state;
+
+        uint32_t party_seq;
+        uint32_t party_ack;
+        // For debugging (relative sequence numbers)
+        uint32_t party_seq_start;
+
+        struct ln_data * party_sendq;
+        struct ln_data * party_recvq;
+
+        // Sent messages which have not been acknowledged
+        struct tcp_buffer party_unacked;
+        // Received messages which were out of order
+        struct tcp_buffer party_reorder;
+
+        // SYN options
+        uint32_t party_min_segment_size;
+        uint32_t party_max_segment_size;
+        uint32_t party_window_scale;
+
+        //struct ln_timebase party_time;
+    } conn_parties[2];
 };
 
-struct tcp_conn * tcp_conn_lookup(struct tcp_conn_manager * mgr, struct ln_pkt_tcp * tcp, bool * is_srv) {
+/*
+//TODO
+struct ln_timebase {
+    double tb_offset;
+    double tb_rate;
+
+    size_t tb_count;
+    double tb_claims[16];
+    double tb_stamps[16];
+}
+*/
+
+struct tcp_conn * tcp_conn_lookup(struct tcp_conn_manager * mgr, struct ln_pkt_tcp * tcp, uchar * source_id) {
     struct tcp_conn_key key;
     memset(&key, 0, sizeof key);
 
@@ -38,12 +122,12 @@ struct tcp_conn * tcp_conn_lookup(struct tcp_conn_manager * mgr, struct ln_pkt_t
     for (struct tcp_conn * conn = mgr->conn_head; conn != NULL; conn = conn->conn_next) {
         if (memcmp(conn->conn_key.key_srv, key.key_srv, sizeof key.key_srv) == 0
          && memcmp(conn->conn_key.key_cli, key.key_cli, sizeof key.key_cli) == 0) {
-            *is_srv = true;
+            *source_id = SERVER;
             return conn;
         }
         if (memcmp(conn->conn_key.key_cli, key.key_srv, sizeof key.key_srv) == 0
          && memcmp(conn->conn_key.key_srv, key.key_cli, sizeof key.key_cli) == 0) {
-            *is_srv = false;
+            *source_id = CLIENT;
             return conn;
         }
     }
@@ -61,6 +145,150 @@ struct tcp_conn * tcp_conn_lookup(struct tcp_conn_manager * mgr, struct ln_pkt_t
     return conn;
 }
 
+static int tcp_conn_send(struct tcp_conn * conn, uchar source_id, uint8_t tcp_flags) {
+    // TODO
+    return -1;
+}
+
+static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_tcp * tcp) {
+    ASSERT(source_id == SERVER || source_id == CLIENT);
+    uchar src_id = source_id;
+    uchar dst_id = 1 - source_id;
+    struct tcp_party * src_party = &conn->conn_parties[src_id];
+    struct tcp_party * dst_party = &conn->conn_parties[dst_id];
+
+    // TODO: Update timestamp estimator
+
+    size_t data_len = ln_data_len(tcp->tcp_pkt.pkt_data);
+    if (data_len > 0) { // Has data
+        if (src_party->party_state == TCP_ESTABLISHED) {
+            // Recieve data into buffer
+            
+            // TODO: Add to party_reorder instead of to sendq
+            if (src_party->party_ack != tcp->tcp_seq)
+                WARN("Expected seq %u; got %u", src_party->party_ack, tcp->tcp_seq);
+
+            ln_data_extend(&src_party->party_sendq, tcp->tcp_pkt.pkt_data);
+            src_party->party_ack += data_len;
+
+            // TODO: rc
+            tcp_conn_send(conn, src_id, LN_PROTO_TCP_FLAG_ACK);
+        }
+    }
+
+    if (tcp->tcp_flags & LN_PROTO_TCP_FLAG_SYN) {
+        dst_party->party_base_pkt = &tcp->tcp_pkt;
+        ln_pkt_incref(&tcp->tcp_pkt);
+
+        dst_party->party_seq = tcp->tcp_seq;
+        src_party->party_ack = tcp->tcp_seq + 1;
+        dst_party->party_seq_start = tcp->tcp_seq;
+
+        dst_party->party_window_scale = 0;
+
+        src_party->party_min_segment_size = 1;
+        src_party->party_max_segment_size = LN_PROTO_TCP_DEFAULT_MSS; //536
+
+        // TODO: Iterate over tcp_opts
+        //     TODO: Set MSS
+        //     TODO: Set WSCALE
+
+
+        if (src_party->party_state == TCP_SYN_SENT) {
+            // #src: TCP_SYN_SENT -> TCP_ESTABLISHED;
+            src_party->party_state = TCP_ESTABLISHED;
+            INFO("Established connection");
+            // The ACK reply gets handled later on
+
+            // Forward SYNACK
+            // #dst: TCP_UNINITIALIZED -> TCP_SYN_RECEIVED;
+            dst_party->party_state = TCP_SYN_RECEIVED;
+            // TODO: rc
+            tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_SYN | LN_PROTO_TCP_FLAG_ACK);
+        } else {
+            // #dst: TCP_UNINITIALIZED -> TCP_SYN_SENT;
+            dst_party->party_state = TCP_SYN_SENT;
+            // Forward SYN
+            // TODO: rc
+            tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_SYN);
+        }
+    }
+
+    if (tcp->tcp_flags & LN_PROTO_TCP_FLAG_FIN) {
+        if (src_party->party_state == TCP_ESTABLISHED) {
+            src_party->party_ack++;
+            // #src: TCP_ESTABLISHED -> TCP_LAST_ACK;
+            src_party->party_state = TCP_LAST_ACK;
+
+            if (dst_party->party_state == TCP_ESTABLISHED) {
+                // #dst: TCP_ESTABLISHED -> TCP_FIN_WAIT_1;
+                dst_party->party_state = TCP_FIN_WAIT_1;
+
+                // Forward FIN - nope! send a close msg
+                // TODO: Handle close
+                // TODO: rc
+                tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_FIN | LN_PROTO_TCP_FLAG_ACK);
+                dst_party->party_seq++;
+            }
+
+            // Reply with FINACK
+            // TODO: rc
+            tcp_conn_send(conn, src_id, LN_PROTO_TCP_FLAG_FIN | LN_PROTO_TCP_FLAG_ACK);
+            // TODO: Clean up connection
+        }
+    } else if (tcp->tcp_flags & LN_PROTO_TCP_FLAG_ACK) {
+        if (src_party->party_state == TCP_SYN_RECEIVED) {
+            // #src: TCP_SYN_RECEIVED -> TCP_ESTABLISHED;
+            src_party->party_state = TCP_ESTABLISHED;
+            INFO("TCP connection established");
+        }
+
+        if (src_party->party_state == TCP_ESTABLISHED) {
+            src_party->party_seq = MAX(src_party->party_seq, tcp->tcp_ack);
+            // We don't need to ACK unless it's a SYNACK
+            if (tcp->tcp_flags & LN_PROTO_TCP_FLAG_SYN) {
+                // TODO: rc
+                tcp_conn_send(conn, src_id, LN_PROTO_TCP_FLAG_ACK);
+            }
+        }
+
+        if (src_party->party_state == TCP_LAST_ACK) {
+            // #src: TCP_LAST_ACK -> TCP_CLOSED
+            src_party->party_seq = TCP_CLOSED;
+            // TODO: Handle close (but the conn is already 'closed')
+        }
+    }
+
+    if (tcp->tcp_flags & LN_PROTO_TCP_FLAG_RST) {
+        if (src_party->party_state == TCP_UNINITIALIZED
+         && dst_party->party_state == TCP_UNINITIALIZED) {
+            // TODO: pass through?
+        } else {
+            INFO("RST on connection");
+            uchar old_dst_state = dst_party->party_state;
+
+            dst_party->party_state = TCP_RESET;
+            src_party->party_state = TCP_CLOSED;
+
+            if (old_dst_state == TCP_UNINITIALIZED) {
+                INFO("Invalid RST; dst uninitialized");
+                // TODO: pass through?
+            } else {
+                // TODO: rc
+                tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_RST);
+            }
+
+            // TODO: Handle close
+        }
+    }
+
+    if (dst_party->party_state == TCP_UNINITIALIZED) {
+        // TODO: pass through; unhandled
+    }
+
+    return 0;
+}
+
 // tcp_dec: Decode TCP header and associate with connection
 void * tcp_dec_create(Agnode_t * node) {
     struct tcp_conn_manager * mgr = calloc(1, sizeof(struct tcp_conn_manager));
@@ -74,7 +302,8 @@ void tcp_dec_destroy(Agnode_t * node, void * filter) {
     while (mgr->conn_head != NULL) {
         struct tcp_conn * conn = mgr->conn_head;
         mgr->conn_head = conn->conn_next;
-        // TODO: Dangling conn pointers?
+        // TODO: Implement tcp_conn_destroy
+        //tcp_conn_destroy(conn);
         free(conn);
     }
     free(mgr);
@@ -86,13 +315,21 @@ int tcp_dec_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
     struct ln_pkt_tcp * tcp = LN_PKT_DEC(pkt, tcp);
     if (tcp == NULL) return -1;
 
-    bool is_srv = false;
-    tcp->tcp_conn = tcp_conn_lookup(mgr, tcp, &is_srv);
+    uchar src = 0;
+    struct tcp_conn * conn = tcp->tcp_conn = tcp_conn_lookup(mgr, tcp, &src);
 
-    int rc = 0; 
-    for (AG_EACH_EDGEOUT(node, edge)) {
-        rc |= ln_filter_push(edge, &tcp->tcp_pkt);
+    ASSERT(conn != NULL);
+    if (conn->conn_out == NULL) {
+        for (AG_EACH_EDGEOUT(node, edge)) {
+            if (ln_ag_attr_bool(edge, "output", false)) {
+                conn->conn_out = edge;
+                continue;
+            }
+            // TODO: Parse ports to find party_out edges
+        }
     }
+
+    int rc = tcp_conn_recv(conn, src, tcp);
 
     ln_pkt_decref(&tcp->tcp_pkt);
     return rc;

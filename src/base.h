@@ -35,6 +35,8 @@ struct ln_data {
 
 size_t ln_data_len(struct ln_data * data);
 struct ln_data * ln_data_create(size_t size);
+ssize_t ln_data_write(struct ln_data ** base, const uchar * buf, size_t len); // Returns total length
+ssize_t ln_data_extend(struct ln_data ** base, const struct ln_data * data); // Returns total length
 int ln_data_fdump(struct ln_data * data, FILE * stream);
 
 // Utils

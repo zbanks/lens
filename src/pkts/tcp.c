@@ -1,6 +1,9 @@
 #include "pkts/tcp.h"
 #include <strings.h>
 
+//LN_PROTO_TCP_FLAGS_GEN(LN_MAP_ENUM_BITMASK_PRINT_DEFINE);
+//LN_PROTO_TCP_FLAGS_GEN(LN_MAP_ENUM_SCAN_PROTO);
+
 struct ln_pkt * ln_pkt_tcp_dec(struct ln_pkt * parent_pkt) {
     struct ln_data * data = parent_pkt->pkt_data;
     uchar * rpos = data->data_pos;
@@ -22,13 +25,16 @@ struct ln_pkt * ln_pkt_tcp_dec(struct ln_pkt * parent_pkt) {
     tcp->tcp_crc = ln_read16(&rpos, LN_NTOH);
     tcp->tcp_urg = ln_read16(&rpos, LN_NTOH);
 
-    //TODO: tcp options
     uint8_t data_offset = (tcp->tcp_flags >> 12) * 4;
-
     if (data->data_pos + data_offset > data->data_last) {
         SET_ERRNO(EMSGSIZE);
         goto fail;
     }
+    tcp->tcp_flags &= 0x00FFFFFF;
+
+    tcp->tcp_optlen = data_offset - LN_PROTO_TCP_HEADER_LEN_MIN;
+    ASSERT(tcp->tcp_optlen <= sizeof tcp->tcp_opts);
+    memcpy(tcp->tcp_opts, rpos, tcp->tcp_optlen);
 
     data->data_pos += data_offset;
     tcp->tcp_pkt.pkt_data = data;
@@ -43,6 +49,46 @@ struct ln_pkt * ln_pkt_tcp_dec(struct ln_pkt * parent_pkt) {
 fail:
     free(tcp);
     return NULL;
+}
+
+static int ln_pkt_tcp_len(struct ln_pkt * pkt, size_t * header_len, size_t * footer_len) {
+    struct ln_pkt_tcp * tcp = LN_PKT_CAST(pkt, tcp);
+    if (tcp == NULL) return SET_ERRNO(EINVAL), -1;
+
+    while (tcp->tcp_optlen & 0x3)
+        tcp->tcp_opts[tcp->tcp_optlen++] = 0;
+
+    *header_len = LN_PROTO_TCP_HEADER_LEN_MIN + tcp->tcp_optlen;
+    *footer_len = 0;
+    return 0;
+}
+
+static int ln_pkt_tcp_enc(struct ln_pkt * pkt, struct ln_data * data) {
+    struct ln_pkt_tcp * tcp = LN_PKT_CAST(pkt, tcp);
+    if (tcp == NULL) return SET_ERRNO(EINVAL), -1;
+
+    uchar * new_pos = data->data_pos - (LN_PROTO_TCP_HEADER_LEN_MIN + tcp->tcp_optlen);
+    uchar * rpos = new_pos;
+    ASSERT(new_pos >= data->data_start);
+
+    uint16_t flags = tcp->tcp_flags;
+    flags |= (LN_PROTO_TCP_HEADER_LEN_MIN + tcp->tcp_optlen) << 10;
+
+    ln_write16(&rpos, tcp->tcp_src, LN_HTON);
+    ln_write16(&rpos, tcp->tcp_dst, LN_HTON);
+    ln_write32(&rpos, tcp->tcp_seq, LN_HTON);
+    ln_write32(&rpos, tcp->tcp_ack, LN_HTON);
+    ln_write16(&rpos, flags, LN_HTON);
+    ln_write16(&rpos, tcp->tcp_window, LN_HTON);
+    ln_write16(&rpos, tcp->tcp_crc, LN_HTON);
+    ln_write16(&rpos, tcp->tcp_urg, LN_HTON);
+
+    memcpy(rpos, tcp->tcp_opts, tcp->tcp_optlen);
+    rpos += tcp->tcp_optlen;
+
+    ASSERT(rpos == data->data_pos);
+    data->data_pos = new_pos;
+    return 0;
 }
 
 int ln_pkt_tcp_fdump(struct ln_pkt * pkt, FILE * stream) {
@@ -78,7 +124,5 @@ int ln_pkt_tcp_parse_port(const char * port_str) {
     return port;
 }
 
-#define ln_pkt_tcp_len NULL
-#define ln_pkt_tcp_enc NULL
 #define ln_pkt_tcp_term NULL
 LN_PKT_TYPE_DECLARE(tcp);

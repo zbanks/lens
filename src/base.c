@@ -31,6 +31,48 @@ struct ln_data * ln_data_create(size_t size) {
     return data;
 }
 
+ssize_t ln_data_write(struct ln_data ** base, const uchar * buf, size_t len) {
+    size_t total_len = 0;
+    struct ln_data * data = *base;
+
+    if (data == NULL) {
+        data = *base = ln_data_create(len);
+    } else {
+        while (data->data_next != NULL) {
+            total_len += data->data_last - data->data_pos;
+            data = data->data_next;
+        }
+        total_len += data->data_last - data->data_pos;
+        size_t len_remaining = data->data_end - data->data_last;
+        if (len_remaining < len) {
+            data->data_next = ln_data_create(len - len_remaining);
+            if (data->data_next == NULL) MEMFAIL();
+
+            memcpy(data->data_last, buf, len_remaining);
+            data->data_last += len_remaining;
+            buf += len_remaining;
+            len -= len_remaining;
+            total_len += len_remaining;
+            data = data->data_next;
+        }
+    }
+
+    memcpy(data->data_last, buf, len);
+    data->data_last += len;
+    total_len += len;
+
+    return total_len;
+}
+
+ssize_t ln_data_extend(struct ln_data ** base, const struct ln_data * data) {
+    ssize_t rc = -1;
+    while (data != NULL) {
+        rc = ln_data_write(base, data->data_pos, data->data_last - data->data_pos);
+        data = data->data_next;
+    }
+    return rc;
+}
+
 int ln_data_fdump(struct ln_data * data, FILE * stream) {
     return fhexdump(stream, data->data_pos, data->data_last - data->data_pos);
 }
