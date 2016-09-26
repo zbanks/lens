@@ -11,15 +11,10 @@
 
 #include "log.h"
 
-//
-
 // 
 
 typedef uint32_t refcnt_t;
 typedef unsigned char uchar;
-
-#define LN_BUF_SIZE_MIN (4096 - sizeof(refcnt_t) - sizeof(uint32_t))
-#define LN_BUF_LAST(bufp) (&(bufp)->buf_start[(bufp)->buf_size])
 
 #define LN_DATA_HEADER_SIZE (4 * sizeof(uchar *))
 #define LN_DATA_SIZE_MIN (2048 - LN_DATA_HEADER_SIZE)
@@ -40,6 +35,9 @@ ssize_t ln_data_extend(struct ln_data ** base, const struct ln_data * data); // 
 int ln_data_fdump(struct ln_data * data, FILE * stream);
 
 // Utils
+
+#define LN_MIN(x, y) ((x) < (y) ? (x) : (y))
+#define LN_MAX(x, y) ((x) < (y) ? (y) : (x))
 
 int fhexdump(FILE * stream, uchar * buf, size_t len);
 

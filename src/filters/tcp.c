@@ -2,8 +2,6 @@
 #include "pkts/lowlevel.h"
 #include "pkts/tcp.h"
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
 /* 
 Generate state transition diagram
 ---------------------------------
@@ -31,8 +29,8 @@ struct tcp_conn_key {
 };
 
 struct tcp_buffer {
-    struct tcp_unacked * next;
-    struct tcp_unacked * prev;
+    struct tcp_buffer * next;
+    struct tcp_buffer * prev;
     uint64_t timestamp;
     struct ln_pkt_tcp * tcp_pkt;
 };
@@ -44,6 +42,7 @@ struct tcp_conn {
     struct tcp_conn_key conn_key;
 
     Agedge_t * conn_out;
+    Agedge_t * conn_pass;
 
     struct tcp_party {
         struct ln_pkt * party_base_pkt;
@@ -66,6 +65,8 @@ struct tcp_conn {
             TCP_CLOSED,
         } party_state;
 
+        uint16_t party_src;
+        uint16_t party_dst;
         uint32_t party_seq;
         uint32_t party_ack;
         // For debugging (relative sequence numbers)
@@ -83,6 +84,7 @@ struct tcp_conn {
         uint32_t party_min_segment_size;
         uint32_t party_max_segment_size;
         uint32_t party_window_scale;
+        uint16_t party_window;
 
         //struct ln_timebase party_time;
     } conn_parties[2];
@@ -145,9 +147,75 @@ struct tcp_conn * tcp_conn_lookup(struct tcp_conn_manager * mgr, struct ln_pkt_t
     return conn;
 }
 
-static int tcp_conn_send(struct tcp_conn * conn, uchar source_id, uint8_t tcp_flags) {
-    // TODO
-    return -1;
+static int tcp_conn_pass(struct tcp_conn * conn, struct ln_pkt_tcp * tcp) {
+    ASSERT(conn->conn_pass != NULL);
+    return ln_filter_push(conn->conn_pass, &tcp->tcp_pkt);
+}
+
+static int tcp_conn_send(struct tcp_conn * conn, uchar destination_id, uint8_t tcp_flags) {
+    ASSERT(destination_id == SERVER || destination_id == CLIENT);
+    uchar dst_id = destination_id;
+    //uchar src_id = 1 - destination_id;
+    //struct tcp_party * src_party = &conn->conn_parties[src_id];
+    struct tcp_party * dst_party = &conn->conn_parties[dst_id];
+
+    //
+
+    size_t payload_size = dst_party->party_max_segment_size;
+    struct ln_data * payload = NULL;
+    if (dst_party->party_sendq != NULL) {
+        struct ln_data * next = NULL;
+        while (dst_party->party_sendq && ln_data_len(payload) <= payload_size) {
+            if (next == NULL) {
+                payload = dst_party->party_sendq;
+                next = payload;
+            } else {
+                next->data_next = dst_party->party_sendq;
+            }
+            dst_party->party_sendq = next->data_next;
+            next->data_next = NULL;
+        }
+        tcp_flags |= LN_PROTO_TCP_FLAG_PSH;
+    }
+    payload_size = ln_data_len(payload);
+    ASSERT(payload_size <= dst_party->party_max_segment_size);
+
+    //
+
+    struct ln_pkt_tcp * tcp = calloc(1, sizeof *tcp);
+    if (tcp == NULL) MEMFAIL();
+
+    tcp->tcp_pkt.pkt_type = ln_pkt_type_tcp;
+    tcp->tcp_pkt.pkt_data = payload;
+    tcp->tcp_pkt.pkt_parent = dst_party->party_base_pkt;
+    ln_pkt_incref(dst_party->party_base_pkt);
+
+    tcp->tcp_src = dst_party->party_src;
+    tcp->tcp_dst = dst_party->party_dst;
+    tcp->tcp_seq = dst_party->party_seq;
+    tcp->tcp_ack = dst_party->party_ack;
+    tcp->tcp_flags = tcp_flags;
+    tcp->tcp_window = dst_party->party_window;
+    // TODO: options; urgent
+
+    //
+    if (payload_size > 0) {
+        struct tcp_buffer * unacked = calloc(1, sizeof *unacked);
+        if (unacked == NULL) MEMFAIL();
+        if (dst_party->party_unacked.prev == NULL)
+            dst_party->party_unacked.prev = unacked;
+        unacked->prev = NULL;
+        unacked->next = dst_party->party_unacked.next;
+        dst_party->party_unacked.next = unacked;
+
+        unacked->timestamp = now();
+        unacked->tcp_pkt = tcp;
+        ln_pkt_incref(&tcp->tcp_pkt);
+    }
+
+    dst_party->party_seq += payload_size;
+
+    return ln_filter_push(conn->conn_out, &tcp->tcp_pkt);
 }
 
 static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_tcp * tcp) {
@@ -156,6 +224,8 @@ static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_
     uchar dst_id = 1 - source_id;
     struct tcp_party * src_party = &conn->conn_parties[src_id];
     struct tcp_party * dst_party = &conn->conn_parties[dst_id];
+
+    int rc = 0;
 
     // TODO: Update timestamp estimator
 
@@ -171,8 +241,7 @@ static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_
             ln_data_extend(&src_party->party_sendq, tcp->tcp_pkt.pkt_data);
             src_party->party_ack += data_len;
 
-            // TODO: rc
-            tcp_conn_send(conn, src_id, LN_PROTO_TCP_FLAG_ACK);
+            rc |= tcp_conn_send(conn, src_id, LN_PROTO_TCP_FLAG_ACK);
         }
     }
 
@@ -180,19 +249,39 @@ static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_
         dst_party->party_base_pkt = &tcp->tcp_pkt;
         ln_pkt_incref(&tcp->tcp_pkt);
 
+        dst_party->party_dst = src_party->party_src = tcp->tcp_src;
+        dst_party->party_src = src_party->party_dst = tcp->tcp_dst;
+
         dst_party->party_seq = tcp->tcp_seq;
         src_party->party_ack = tcp->tcp_seq + 1;
         dst_party->party_seq_start = tcp->tcp_seq;
 
+        dst_party->party_window = tcp->tcp_window;
         dst_party->party_window_scale = 0;
 
         src_party->party_min_segment_size = 1;
         src_party->party_max_segment_size = LN_PROTO_TCP_DEFAULT_MSS; //536
 
-        // TODO: Iterate over tcp_opts
-        //     TODO: Set MSS
-        //     TODO: Set WSCALE
-
+        uchar * opt = tcp->tcp_opts;
+        while (opt < tcp->tcp_opts + tcp->tcp_optlen) {
+            uchar opt_type = *opt++;
+            if (opt_type == 0) continue;
+            uchar opt_len = *opt++;
+            switch (opt_type) {
+            case LN_PROTO_TCP_OPT_NOP:
+                break;
+            case LN_PROTO_TCP_OPT_MSS:
+                //TODO: Set MSS
+                break;
+            case LN_PROTO_TCP_OPT_WSCALE:
+                //TODO: Set WSCALE
+                break;
+            default:
+                INFO("Unknown tcp option '%#02x'", opt_type);
+                break;
+            }
+            opt += opt_len;
+        }
 
         if (src_party->party_state == TCP_SYN_SENT) {
             // #src: TCP_SYN_SENT -> TCP_ESTABLISHED;
@@ -203,14 +292,12 @@ static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_
             // Forward SYNACK
             // #dst: TCP_UNINITIALIZED -> TCP_SYN_RECEIVED;
             dst_party->party_state = TCP_SYN_RECEIVED;
-            // TODO: rc
-            tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_SYN | LN_PROTO_TCP_FLAG_ACK);
+            rc |= tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_SYN | LN_PROTO_TCP_FLAG_ACK);
         } else {
             // #dst: TCP_UNINITIALIZED -> TCP_SYN_SENT;
             dst_party->party_state = TCP_SYN_SENT;
             // Forward SYN
-            // TODO: rc
-            tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_SYN);
+            rc |= tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_SYN);
         }
     }
 
@@ -226,14 +313,12 @@ static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_
 
                 // Forward FIN - nope! send a close msg
                 // TODO: Handle close
-                // TODO: rc
-                tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_FIN | LN_PROTO_TCP_FLAG_ACK);
+                rc |= tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_FIN | LN_PROTO_TCP_FLAG_ACK);
                 dst_party->party_seq++;
             }
 
             // Reply with FINACK
-            // TODO: rc
-            tcp_conn_send(conn, src_id, LN_PROTO_TCP_FLAG_FIN | LN_PROTO_TCP_FLAG_ACK);
+            rc |= tcp_conn_send(conn, src_id, LN_PROTO_TCP_FLAG_FIN | LN_PROTO_TCP_FLAG_ACK);
             // TODO: Clean up connection
         }
     } else if (tcp->tcp_flags & LN_PROTO_TCP_FLAG_ACK) {
@@ -244,11 +329,10 @@ static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_
         }
 
         if (src_party->party_state == TCP_ESTABLISHED) {
-            src_party->party_seq = MAX(src_party->party_seq, tcp->tcp_ack);
+            src_party->party_seq = LN_MAX(src_party->party_seq, tcp->tcp_ack);
             // We don't need to ACK unless it's a SYNACK
             if (tcp->tcp_flags & LN_PROTO_TCP_FLAG_SYN) {
-                // TODO: rc
-                tcp_conn_send(conn, src_id, LN_PROTO_TCP_FLAG_ACK);
+                rc |= tcp_conn_send(conn, src_id, LN_PROTO_TCP_FLAG_ACK);
             }
         }
 
@@ -262,7 +346,8 @@ static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_
     if (tcp->tcp_flags & LN_PROTO_TCP_FLAG_RST) {
         if (src_party->party_state == TCP_UNINITIALIZED
          && dst_party->party_state == TCP_UNINITIALIZED) {
-            // TODO: pass through?
+            // Pass through unhandled
+            rc |= tcp_conn_pass(conn, tcp);
         } else {
             INFO("RST on connection");
             uchar old_dst_state = dst_party->party_state;
@@ -272,10 +357,10 @@ static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_
 
             if (old_dst_state == TCP_UNINITIALIZED) {
                 INFO("Invalid RST; dst uninitialized");
-                // TODO: pass through?
+                // Pass through
+                rc |= tcp_conn_pass(conn, tcp);
             } else {
-                // TODO: rc
-                tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_RST);
+                rc |= tcp_conn_send(conn, dst_id, LN_PROTO_TCP_FLAG_RST);
             }
 
             // TODO: Handle close
@@ -283,10 +368,11 @@ static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_
     }
 
     if (dst_party->party_state == TCP_UNINITIALIZED) {
-        // TODO: pass through; unhandled
+        // Pass through unhandled
+        rc |= tcp_conn_pass(conn, tcp);
     }
 
-    return 0;
+    return rc;
 }
 
 // tcp_dec: Decode TCP header and associate with connection
@@ -323,6 +409,10 @@ int tcp_dec_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
         for (AG_EACH_EDGEOUT(node, edge)) {
             if (ln_ag_attr_bool(edge, "output", false)) {
                 conn->conn_out = edge;
+                continue;
+            }
+            if (ln_ag_attr_bool(edge, "pass", false)) {
+                conn->conn_pass = edge;
                 continue;
             }
             // TODO: Parse ports to find party_out edges
