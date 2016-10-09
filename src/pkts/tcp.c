@@ -1,7 +1,7 @@
 #include "pkts/tcp.h"
 #include <strings.h>
 
-//LN_PROTO_TCP_FLAGS_GEN(LN_MAP_ENUM_BITMASK_PRINT_DEFINE);
+LN_PROTO_TCP_FLAGS_GEN(LN_MAP_ENUM_BITMAP_PRINT_DEFINE);
 //LN_PROTO_TCP_FLAGS_GEN(LN_MAP_ENUM_SCAN_PROTO);
 
 struct ln_pkt * ln_pkt_tcp_dec(struct ln_pkt * parent_pkt) {
@@ -98,6 +98,7 @@ int ln_pkt_tcp_fdump(struct ln_pkt * pkt, FILE * stream) {
                            " len=%zu"
                            " src=%hu"
                            " dst=%hu"
+                           " flags=%s"
                            " seq=%u"
                            " ack=%u"
                            " window=%hu"
@@ -105,6 +106,7 @@ int ln_pkt_tcp_fdump(struct ln_pkt * pkt, FILE * stream) {
                     ln_data_len(tcp->tcp_pkt.pkt_data),
                     tcp->tcp_src,
                     tcp->tcp_dst,
+                    ln_proto_tcp_flags_print(tcp->tcp_flags),
                     tcp->tcp_seq,
                     tcp->tcp_ack,
                     tcp->tcp_window);

@@ -2,6 +2,34 @@
 
 #define LN_PROTO_DNS_HEADER_LEN ((size_t) 12)
 
+enum ln_proto_dns_type {
+    LN_PROTO_DNS_TYPE_A     = 1,
+    LN_PROTO_DNS_TYPE_NS    = 2,
+    LN_PROTO_DNS_TYPE_CNAME = 5,
+    LN_PROTO_DNS_TYPE_SOA   = 6,
+    LN_PROTO_DNS_TYPE_PTR   = 12,
+    LN_PROTO_DNS_TYPE_HINFO = 13,
+    LN_PROTO_DNS_TYPE_AAAA  = 28,
+    LN_PROTO_DNS_TYPE_TXT   = 16,
+    LN_PROTO_DNS_TYPE_SRV   = 33,
+    LN_PROTO_DNS_TYPE_ANY   = 255,
+};
+
+struct ln_enum ln_proto_dns_type_enum[] = {
+    {LN_PROTO_DNS_TYPE_A     , "A"},
+    {LN_PROTO_DNS_TYPE_NS    , "NS"},
+    {LN_PROTO_DNS_TYPE_CNAME , "CNAME"},
+    {LN_PROTO_DNS_TYPE_SOA   , "SOA"},
+    {LN_PROTO_DNS_TYPE_PTR   , "PTR"},
+    {LN_PROTO_DNS_TYPE_HINFO , "HINFO"},
+    {LN_PROTO_DNS_TYPE_AAAA  , "AAAA"},
+    {LN_PROTO_DNS_TYPE_TXT   , "TXT"},
+    {LN_PROTO_DNS_TYPE_SRV   , "SRV"},
+    {LN_PROTO_DNS_TYPE_ANY   , "ANY"},
+    {0, 0},
+};
+
+/*
 #define LN_PROTO_DNS_TYPE_MAP(FN, ARG) \
     FN(ARG, A,     1)  \
     FN(ARG, NS,    2)  \
@@ -19,6 +47,7 @@
 LN_PROTO_DNS_TYPE_GEN(LN_MAP_ENUM_DEFINE);
 LN_PROTO_DNS_TYPE_GEN(LN_MAP_ENUM_PRINT_PROTO);
 LN_PROTO_DNS_TYPE_GEN(LN_MAP_ENUM_SCAN_PROTO);
+*/
 
 #define LN_PROTO_DNS_FLAGS_OPCODE_MASK 0x7800
 #define LN_PROTO_DNS_FLAGS_OPCODE_OFFSET 11

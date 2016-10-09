@@ -165,8 +165,10 @@ static int tcp_conn_send(struct tcp_conn * conn, uchar destination_id, uint8_t t
     struct ln_data * payload = NULL;
     if (dst_party->party_sendq != NULL) {
         struct ln_data * next = NULL;
-        while (dst_party->party_sendq && ln_data_len(payload) <= payload_size) {
+        // payload -> _ -> _ -> next -> NULL; party_sendq -> _ -> _ -> NULL
+        while (dst_party->party_sendq) { // && ln_data_len(payload) <= payload_size) {
             if (next == NULL) {
+                // First data chunk
                 payload = dst_party->party_sendq;
                 next = payload;
             } else {
@@ -174,6 +176,25 @@ static int tcp_conn_send(struct tcp_conn * conn, uchar destination_id, uint8_t t
             }
             dst_party->party_sendq = next->data_next;
             next->data_next = NULL;
+
+            size_t payload_len = ln_data_len(payload);
+            if (payload_len == payload_size) {
+                break;
+            } else if (payload_len > payload_size) {
+                size_t extra_len = payload_len - payload_size;
+                ASSERT(next->data_last - extra_len > next->data_pos);
+
+                struct ln_data * extra_data = NULL;
+                ssize_t rc = ln_data_write(&extra_data, next->data_last - extra_len, extra_len);
+                ASSERT(rc >= 0);
+                ASSERT(extra_data != NULL);
+                next->data_last -= extra_len;
+
+                extra_data->data_next = dst_party->party_sendq;
+                dst_party->party_sendq = extra_data;
+                ASSERT(payload_size == ln_data_len(payload));
+                break;
+            }
         }
         tcp_flags |= LN_PROTO_TCP_FLAG_PSH;
     }
@@ -275,6 +296,9 @@ static int tcp_conn_recv(struct tcp_conn * conn, uchar source_id, struct ln_pkt_
                 break;
             case LN_PROTO_TCP_OPT_WSCALE:
                 //TODO: Set WSCALE
+                break;
+            case LN_PROTO_TCP_OPT_TIMESTAMPS:
+                //TODO: Update timestamps
                 break;
             default:
                 INFO("Unknown tcp option '%#02x'", opt_type);
@@ -403,6 +427,10 @@ int tcp_dec_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
 
     uchar src = 0;
     struct tcp_conn * conn = tcp->tcp_conn = tcp_conn_lookup(mgr, tcp, &src);
+
+    fprintf(stderr, "TCP: ");
+    ln_pkt_fdump(&tcp->tcp_pkt, stderr);
+    fprintf(stderr, "\n");
 
     ASSERT(conn != NULL);
     if (conn->conn_out == NULL) {

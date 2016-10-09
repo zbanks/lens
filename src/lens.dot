@@ -3,7 +3,8 @@ digraph {
     print_ipv4 [type=print prefix=IPV4];
     print_dns [type=print prefix=DNS];
     print_udp [type=print prefix=UDP];
-    print_tcp [type=print prefix=TCP all=0];
+    print_tcp1 [type=print prefix=TCP_pass all=0];
+    print_tcp2 [type=print prefix=TCP_data all=0];
     output [type=output];
 
     input -> eth_dec;
@@ -11,7 +12,9 @@ digraph {
     ipv4_dec -> udp_dec [proto=udp];
     udp_dec -> dns_dec [port=53];
     ipv4_dec -> tcp_dec [proto=tcp];
-    tcp_dec -> print_tcp;
+
+    tcp_dec -> print_tcp1 [pass=true];
+    tcp_dec -> print_tcp2 [output=true];
     /*
     dns_dec -> print_dns;
     udp_dec -> print_udp [unmatched=1];
