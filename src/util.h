@@ -1,4 +1,5 @@
 #pragma once
+#include "base.h"
 
 #define LN_CONCAT(X, Y) LN_CONCAT2(X, Y)
 #define LN_CONCAT2(X, Y) X ## Y
@@ -6,12 +7,17 @@
 #define LN_STRINGIFY(X) LN_STRINGIFY2(X)
 #define LN_STRINGIFY2(X) #X
 
-/*
-#define FST(pair) FST2 pair
-#define FST2(X, Y) X
-#define SND(pair) SND2 pair
-#define SND2(X, Y) Y
-*/
+//
+
+struct ln_enum {
+    int value;
+    const char * name;
+};
+
+const char * ln_enum_str(const struct ln_enum * data, bool is_flags, int val);
+int ln_enum_scan(const struct ln_enum * data, bool is_flags, const char * str);
+
+//
 
 #define LN_MAP_ENUM_DEFINE(name, prefix, MAP) enum name { MAP(LN_MAP_ENUM_DEFINE2, prefix) }
 #define LN_MAP_ENUM_DEFINE2(PREFIX, NAME, VALUE)  LN_CONCAT(PREFIX ## _, NAME) = VALUE,

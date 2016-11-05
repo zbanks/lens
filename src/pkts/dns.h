@@ -15,20 +15,6 @@ enum ln_proto_dns_type {
     LN_PROTO_DNS_TYPE_ANY   = 255,
 };
 
-struct ln_enum ln_proto_dns_type_enum[] = {
-    {LN_PROTO_DNS_TYPE_A     , "A"},
-    {LN_PROTO_DNS_TYPE_NS    , "NS"},
-    {LN_PROTO_DNS_TYPE_CNAME , "CNAME"},
-    {LN_PROTO_DNS_TYPE_SOA   , "SOA"},
-    {LN_PROTO_DNS_TYPE_PTR   , "PTR"},
-    {LN_PROTO_DNS_TYPE_HINFO , "HINFO"},
-    {LN_PROTO_DNS_TYPE_AAAA  , "AAAA"},
-    {LN_PROTO_DNS_TYPE_TXT   , "TXT"},
-    {LN_PROTO_DNS_TYPE_SRV   , "SRV"},
-    {LN_PROTO_DNS_TYPE_ANY   , "ANY"},
-    {0, 0},
-};
-
 /*
 #define LN_PROTO_DNS_TYPE_MAP(FN, ARG) \
     FN(ARG, A,     1)  \

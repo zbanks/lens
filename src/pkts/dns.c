@@ -1,8 +1,25 @@
 #include "pkts/dns.h"
 #include <strings.h>
 
-LN_PROTO_DNS_TYPE_GEN(LN_MAP_ENUM_PRINT_DEFINE);
-LN_PROTO_DNS_TYPE_GEN(LN_MAP_ENUM_SCAN_DEFINE);
+struct ln_enum ln_proto_dns_type_enum[] = {
+    {LN_PROTO_DNS_TYPE_A     , "A"},
+    {LN_PROTO_DNS_TYPE_NS    , "NS"},
+    {LN_PROTO_DNS_TYPE_CNAME , "CNAME"},
+    {LN_PROTO_DNS_TYPE_SOA   , "SOA"},
+    {LN_PROTO_DNS_TYPE_PTR   , "PTR"},
+    {LN_PROTO_DNS_TYPE_HINFO , "HINFO"},
+    {LN_PROTO_DNS_TYPE_AAAA  , "AAAA"},
+    {LN_PROTO_DNS_TYPE_TXT   , "TXT"},
+    {LN_PROTO_DNS_TYPE_SRV   , "SRV"},
+    {LN_PROTO_DNS_TYPE_ANY   , "ANY"},
+    {0, 0},
+};
+
+#define ln_proto_dns_type_str(VAL) ln_enum_str(ln_proto_dns_type_enum, 0, VAL)
+#define ln_proto_dns_type_scan(VAL) ln_enum_scan(ln_proto_dns_type_enum, 0, VAL)
+
+//LN_PROTO_DNS_TYPE_GEN(LN_MAP_ENUM_PRINT_DEFINE);
+//LN_PROTO_DNS_TYPE_GEN(LN_MAP_ENUM_SCAN_DEFINE);
 
 LN_PROTO_DNS_FLAG_GEN(LN_MAP_ENUM_BITMAP_PRINT_DEFINE);
 LN_PROTO_DNS_FLAG_GEN(LN_MAP_ENUM_SCAN_DEFINE);
@@ -99,7 +116,7 @@ int ln_pkt_dns_fdump(struct ln_pkt * pkt, FILE * stream) {
                              " rcode=%s",
                     ln_data_len(dns->dns_pkt.pkt_data),
                     dns->dns_id,
-                    ln_proto_dns_type_print(dns->dns_flags),
+                    ln_proto_dns_type_str(dns->dns_flags),
                     ln_proto_dns_opcode_print(dns->dns_opcode),
                     ln_proto_dns_rcode_print(dns->dns_rcode));
     for (uint16_t i = 0; i < dns->dns_qdc; i++) {
