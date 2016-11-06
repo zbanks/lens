@@ -4,7 +4,8 @@
 
 struct ln_pkt_raw {
     struct ln_pkt raw_pkt;
-    int raw_fd;
+    int raw_src;
+    int raw_dst;
 };
 
 extern struct ln_pkt_type * ln_pkt_type_raw;

@@ -20,7 +20,8 @@ struct ln_pkt_raw * ln_pkt_raw_frecv(int fd) {
     struct ln_pkt_raw * raw = calloc(1, sizeof *raw);
     if (raw == NULL) return NULL;
 
-    raw->raw_fd = fd;
+    raw->raw_src = fd;
+    raw->raw_dst = -1;
     raw->raw_pkt.pkt_parent = NULL;
     raw->raw_pkt.pkt_type = ln_pkt_type_raw;
     raw->raw_pkt.pkt_data = data;
@@ -31,7 +32,7 @@ struct ln_pkt_raw * ln_pkt_raw_frecv(int fd) {
 
 int ln_pkt_raw_fsend(struct ln_pkt_raw * raw) {
     struct ln_data * data = raw->raw_pkt.pkt_data;
-    return send(raw->raw_fd, data->data_pos, data->data_last - data->data_pos, MSG_DONTWAIT);
+    return send(raw->raw_dst, data->data_pos, data->data_last - data->data_pos, MSG_DONTWAIT);
 }
 
 struct ln_pkt * ln_pkt_raw_dec(struct ln_pkt * parent_pkt) {
@@ -39,7 +40,8 @@ struct ln_pkt * ln_pkt_raw_dec(struct ln_pkt * parent_pkt) {
     struct ln_pkt_raw * raw = calloc(1, sizeof *raw);
     if (raw == NULL) return NULL;
 
-    raw->raw_fd = -1;
+    raw->raw_src = -1;
+    raw->raw_dst = -1;
     raw->raw_pkt.pkt_type = ln_pkt_type_raw;
 
     raw->raw_pkt.pkt_data = parent_pkt->pkt_data;
@@ -63,9 +65,10 @@ static int ln_pkt_raw_enc(struct ln_pkt * pkt, struct ln_data * payload_data) {
 int ln_pkt_raw_fdump(struct ln_pkt * pkt, FILE * stream) {
     struct ln_pkt_raw * raw = LN_PKT_CAST(pkt, raw);
     if (raw == NULL) return SET_ERRNO(EINVAL), -1;
-    return fprintf(stream, "[raw len=%zu fd=%d]",
+    return fprintf(stream, "[raw len=%zu src_fd=%d dst_fd=%d]",
                     ln_data_len(pkt->pkt_data),
-                    raw->raw_fd);
+                    raw->raw_src,
+                    raw->raw_dst);
 }
 
 #define ln_pkt_raw_term NULL
