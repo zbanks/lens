@@ -4,6 +4,7 @@
 
 struct ln_pkt_raw {
     struct ln_pkt raw_pkt;
+    uint64_t raw_nanos;
     int raw_src;
     int raw_dst;
 };

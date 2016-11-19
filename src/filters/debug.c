@@ -14,11 +14,13 @@ int print_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
         len = ln_pkt_fdumpall(pkt, stderr);
     else
         len = ln_pkt_fdump(pkt, stderr);
-    fprintf(stderr, "\n");
+    len += fprintf(stderr, "\n");
+    if (ln_ag_attr_bool(node, "data", false))
+        len += ln_data_fdump(pkt->pkt_data, stderr);
 
-    int rc = len < 0 ? -1 : 0;
+    int rc = 0;
     for (AG_EACH_EDGEOUT(node, edge)) {
-        rc |= ln_filter_push(edge, pkt);
+        rc += ln_filter_push(edge, pkt);
     }
 
     return rc;

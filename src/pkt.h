@@ -22,6 +22,7 @@ struct ln_pkt_type {
     int (*pkt_type_enc)(struct ln_pkt * pkt, struct ln_data * payload_data);
     int (*pkt_type_fdump)(struct ln_pkt * pkt, FILE * stream);
     void (*pkt_type_term)(struct ln_pkt * pkt);
+    size_t pkt_type_count;
 };
 
 #define LN_PKT_TYPE_DECLARE(TYPE) \
@@ -31,6 +32,7 @@ struct ln_pkt_type {
         .pkt_type_enc       = ln_pkt_##TYPE##_enc, \
         .pkt_type_fdump     = ln_pkt_##TYPE##_fdump, \
         .pkt_type_term      = ln_pkt_##TYPE##_term, \
+        .pkt_type_count     = 0, \
     }, \
     * LN_PKT_TYPE_NAME(TYPE) = &LN_PKT_TYPE_NAME(TYPE##_)
 

@@ -16,6 +16,8 @@
 typedef uint32_t refcnt_t;
 typedef unsigned char uchar;
 
+extern size_t data_count;
+
 #define LN_DATA_HEADER_SIZE (4 * sizeof(uchar *))
 #define LN_DATA_SIZE_MIN (2048 - LN_DATA_HEADER_SIZE)
 
@@ -30,6 +32,7 @@ struct ln_data {
 
 size_t ln_data_len(struct ln_data * data);
 struct ln_data * ln_data_create(size_t size);
+void ln_data_destroy(struct ln_data * data);
 ssize_t ln_data_write(struct ln_data ** base, const uchar * buf, size_t len); // Returns total length
 ssize_t ln_data_extend(struct ln_data ** base, const struct ln_data * data); // Returns total length
 int ln_data_fdump(struct ln_data * data, FILE * stream);

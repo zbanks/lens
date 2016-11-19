@@ -58,7 +58,7 @@ struct ln_graph * ln_graph_load(FILE * stream) {
 
     graph->graph_input= channel(sizeof(struct ln_pkt_pkt *), 16);
     if (graph->graph_input< 0) PFAIL("Unable to open graph input channel");
-    graph->graph_output = channel(sizeof(struct ln_pkt_pkt *), 16);
+    graph->graph_output = channel(sizeof(struct ln_pkt_pkt *), 64);
     if (graph->graph_output < 0) PFAIL("Unable to open graph output channel");
 
     return graph;
@@ -72,9 +72,9 @@ void coroutine ln_graph_run(struct ln_graph * graph) {
 
         rc = 0; 
         for (AG_EACH_EDGEOUT(graph->_graph_start, edge)) {
-            rc |= ln_filter_push(edge, pkt);
+            rc += ln_filter_push(edge, pkt);
         }
-        if (rc < 0) break;
+        //if (rc < 0) break;
 
         ln_pkt_decref(pkt);
     }
@@ -126,6 +126,20 @@ void ln_filter_type_register(struct ln_filter_type * filter_type) {
     filter_type->filter_next = ln_filter_types_head;
     ln_filter_types_head = filter_type;
 }
+
+// Special case "filter" for getting data out of the sandwich
+
+// output: Send packets to the `graph_output` channel
+int output_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
+    Agraph_t * graph = agraphof(node);
+    struct ln_graph * graph_data = GRAPH_DATA(graph);
+    
+    ln_pkt_incref(pkt);
+    int rc = chsend(graph_data->graph_output, &pkt, sizeof pkt, now() + 100);
+    if (rc < 0 && errno == ETIMEDOUT) FAIL("STALL");
+    return (rc < 0) ? 0 : 1;
+}
+LN_FILTER_TYPE_DECLARE_STATELESS(output)
 
 //
 
@@ -181,6 +195,11 @@ static int ln_filter_perform(Agnode_t * node, struct ln_pkt * pkt) {
         ln_pkt_fdumpall(pkt, stderr);
         fprintf(stderr, "\n");
     }
+    if (rc == 0) {
+        // No match, so push to output
+        rc += output_perform(node, NULL, pkt);
+    }
+    //ln_pkt_decref(pkt);
     return 0; // Keep going through errors for now
 }
 
@@ -211,9 +230,8 @@ void coroutine ln_filter_run(size_t capacity) {
     }
 }
 
+// Returns 1 on success and 0 on failure
 int ln_filter_push(Agedge_t * edge, struct ln_pkt * pkt) {
-    if (queue_ch == -1) return -1;
-
     DEBUG("Pushing packet %p from %s to %s",
             pkt, agnameof(agtail(edge)), agnameof(aghead(edge)));
 
@@ -222,17 +240,8 @@ int ln_filter_push(Agedge_t * edge, struct ln_pkt * pkt) {
         .node = aghead(edge),
         .pkt = pkt,
     };
-    return chsend(queue_ch, &item, sizeof item, -1);
+    int rc = chsend(queue_ch, &item, sizeof item, now() + 100);
+    if (rc < 0 && errno == ETIMEDOUT) FAIL("STALL");
+    if (rc < 0) return 0;
+    return 1;
 }
-
-// Special case "filter" for getting data out of the sandwich
-
-// output: Send packets to the `graph_output` channel
-int output_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
-    Agraph_t * graph = agraphof(node);
-    struct ln_graph * graph_data = GRAPH_DATA(graph);
-    
-    ln_pkt_incref(pkt);
-    return chsend(graph_data->graph_output, &pkt, sizeof pkt, -1);
-}
-LN_FILTER_TYPE_DECLARE_STATELESS(output)

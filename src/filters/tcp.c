@@ -448,8 +448,6 @@ int tcp_dec_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
     }
 
     int rc = tcp_conn_recv(conn, src, tcp);
-
-    ln_pkt_decref(&tcp->tcp_pkt);
-    return rc;
+    return rc < 0 ? 0 : 1;
 }
 LN_FILTER_TYPE_DECLARE(tcp_dec)

@@ -1,5 +1,7 @@
 #include "base.h"
 
+size_t data_count = 0;
+
 extern inline uint8_t ln_read8(uchar ** buf, bool flip);
 extern inline void ln_write8(uchar ** buf, uint8_t val, bool flip);
 extern inline uint16_t ln_read16(uchar **buf, bool flip);
@@ -28,7 +30,14 @@ struct ln_data * ln_data_create(size_t size) {
     data->data_next = NULL;
     data->data_end = &data->data_start[size];
 
+    data_count++;
+
     return data;
+}
+
+void ln_data_destroy(struct ln_data * data) {
+    data_count--;
+    free(data);
 }
 
 ssize_t ln_data_write(struct ln_data ** base, const uchar * buf, size_t len) {

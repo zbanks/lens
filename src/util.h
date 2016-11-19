@@ -9,6 +9,10 @@
 
 //
 
+uint64_t nanos(void);
+
+//
+
 struct ln_enum {
     int value;
     const char * name;

@@ -13,7 +13,7 @@ OBJECTS = $(C_SRC:%.c=$(OBJDIR)/%.o)
 # Compiler flags
 INC = -I. -I/usr/include/libusb-1.0/
 
-CFLAGS = -std=gnu99 -ggdb3 -Og 
+CFLAGS = -std=gnu99 -ggdb3 -Og -rdynamic
 CFLAGS += $(INC)
 CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter
 CFLAGS += -D_POSIX_C_SOURCE=20160619

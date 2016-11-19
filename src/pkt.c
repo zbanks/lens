@@ -3,20 +3,28 @@
 // struct ln_pkt
 
 void ln_pkt_decref(struct ln_pkt * pkt) {
+    //INFO("decref %p %u", pkt, pkt->pkt_refcnt);
+    //BACKTRACE("decref");
     if(!pkt->pkt_refcnt--) {
         if (pkt->pkt_parent != NULL)
             ln_pkt_decref(pkt->pkt_parent);
         if (pkt->pkt_type != NULL && pkt->pkt_type->pkt_type_term != NULL)
             pkt->pkt_type->pkt_type_term(pkt);
+        pkt->pkt_type->pkt_type_count--;
 
+//#define NOFREE
+#ifndef NOFREE
         if (pkt->pkt_data != NULL)
-            free(pkt->pkt_data);
+            ln_data_destroy(pkt->pkt_data);
 
         free(pkt);
+#endif
     }
 }
 
 void ln_pkt_incref(struct ln_pkt * pkt) {
+    //INFO("incref %p %u", pkt, pkt->pkt_refcnt);
+    //BACKTRACE("incref");
     pkt->pkt_refcnt++;
 }
 
@@ -63,10 +71,10 @@ static ssize_t ln_pkt_enc_len(struct ln_pkt * pkt, size_t * header_len) {
 }
 
 struct ln_pkt * ln_pkt_enc(struct ln_pkt * pkt) {
+
     size_t header_len = 0;
     ssize_t data_len = ln_pkt_enc_len(pkt, &header_len);
     if (data_len < 0) return NULL;
-    ASSERT(pkt->pkt_parent != NULL); // a `raw` should always be at the bottom
 
     // TODO: For now we don't support data chaining (e.g. data->data_next)
     struct ln_data * data = NULL;
@@ -91,17 +99,20 @@ struct ln_pkt * ln_pkt_enc(struct ln_pkt * pkt) {
         pkt->pkt_data = NULL;
     }
 
+    ASSERT(data != NULL);
+
     while (1) {
-        if (pkt->pkt_type != NULL && pkt->pkt_type->pkt_type_enc != NULL) {
-            int rc = pkt->pkt_type->pkt_type_enc(pkt, data);
-            if (rc < 0) FAIL("Unrecoverable while encoding"); // TODO: recover from this error
-        }
+        ASSERT(pkt->pkt_type != NULL && pkt->pkt_type->pkt_type_enc != NULL);
+
+        int rc = pkt->pkt_type->pkt_type_enc(pkt, data);
+        if (rc < 0) FAIL("Unrecoverable while encoding"); // TODO: recover from this error
 
         if (pkt->pkt_parent == NULL)
             break;
 
         struct ln_pkt * old_pkt = pkt;
         pkt = pkt->pkt_parent;
+        ln_pkt_incref(pkt);
         ln_pkt_decref(old_pkt);
     }
 

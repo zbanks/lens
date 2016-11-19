@@ -1,5 +1,6 @@
 #include "pkt.h"
 #include "pkts/lowlevel.h"
+#include "util.h"
 #include <strings.h>
 
 // struct ln_pkt_raw
@@ -12,8 +13,9 @@ struct ln_pkt_raw * ln_pkt_raw_frecv(int fd) {
 
     int rc = recv(fd, data->data_start, data->data_end - data->data_start, MSG_DONTWAIT | MSG_TRUNC);
     if (rc < 0) return NULL;
+    if (rc < 2) return SET_ERRNO(EMSGSIZE), NULL; // Tiny frame?
     data->data_pos = data->data_start;
-    data->data_last = data->data_pos + rc;
+    data->data_last = data->data_pos + rc - 2;
     if (data->data_last > data->data_end) // Jumbo frame or something weird?
         return SET_ERRNO(EMSGSIZE), NULL;
 
@@ -22,8 +24,10 @@ struct ln_pkt_raw * ln_pkt_raw_frecv(int fd) {
 
     raw->raw_src = fd;
     raw->raw_dst = -1;
+    raw->raw_nanos = nanos();
     raw->raw_pkt.pkt_parent = NULL;
     raw->raw_pkt.pkt_type = ln_pkt_type_raw;
+    raw->raw_pkt.pkt_type->pkt_type_count++;
     raw->raw_pkt.pkt_data = data;
 
     data = NULL;
@@ -32,7 +36,15 @@ struct ln_pkt_raw * ln_pkt_raw_frecv(int fd) {
 
 int ln_pkt_raw_fsend(struct ln_pkt_raw * raw) {
     struct ln_data * data = raw->raw_pkt.pkt_data;
-    return send(raw->raw_dst, data->data_pos, data->data_last - data->data_pos, MSG_DONTWAIT);
+    ASSERT(data != NULL);
+    if (raw->raw_dst < 0) {
+        WARN("Invalid destination; dropping");
+        return -1;
+    }
+    ssize_t len = data->data_last - data->data_pos;
+    int rc = write(raw->raw_dst, data->data_pos, len);
+    if (rc != len) return -1;
+    return rc;
 }
 
 struct ln_pkt * ln_pkt_raw_dec(struct ln_pkt * parent_pkt) {
@@ -43,6 +55,7 @@ struct ln_pkt * ln_pkt_raw_dec(struct ln_pkt * parent_pkt) {
     raw->raw_src = -1;
     raw->raw_dst = -1;
     raw->raw_pkt.pkt_type = ln_pkt_type_raw;
+    raw->raw_pkt.pkt_type->pkt_type_count++;
 
     raw->raw_pkt.pkt_data = parent_pkt->pkt_data;
     parent_pkt->pkt_data = NULL;
@@ -112,6 +125,7 @@ struct ln_pkt * ln_pkt_eth_dec(struct ln_pkt * parent_pkt) {
     parent_pkt->pkt_data = NULL;
 
     eth->eth_pkt.pkt_type = ln_pkt_type_eth;
+    eth->eth_pkt.pkt_type->pkt_type_count++;
     eth->eth_pkt.pkt_parent = parent_pkt;
     ln_pkt_incref(parent_pkt);
 
@@ -263,6 +277,7 @@ struct ln_pkt * ln_pkt_ipv4_dec(struct ln_pkt * parent_pkt) {
     parent_pkt->pkt_data = NULL;
 
     ipv4->ipv4_pkt.pkt_type = ln_pkt_type_ipv4;
+    ipv4->ipv4_pkt.pkt_type->pkt_type_count++;
     ipv4->ipv4_pkt.pkt_parent = parent_pkt;
     ln_pkt_incref(parent_pkt);
 
@@ -286,6 +301,7 @@ struct ln_pkt * ln_pkt_ipv4_dec(struct ln_pkt * parent_pkt) {
     return &ipv4->ipv4_pkt;
 
 fail:
+    WARN("Failed to parse ipv4 packet");
     free(ipv4);
     return NULL;
 }

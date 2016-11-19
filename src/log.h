@@ -26,7 +26,7 @@ extern enum loglevel {
 
 #define _ERR_MSG(severity, msg, ...) ({if (loglevel <= LOGLEVEL_ ## severity) { fprintf(stderr, "[%-5s] [%s:%d:%s] " msg "\n", _ERR_STRINGIFY(severity), __FILE__, __LINE__, __func__, ## __VA_ARGS__); } })
 
-#define FAIL(...) ({ERROR(__VA_ARGS__); abort();})
+#define FAIL(...) ({ERROR(__VA_ARGS__); BACKTRACE(); abort();})
 #define ERROR(...) _ERR_MSG(ERROR, ## __VA_ARGS__)
 #define WARN(...)  _ERR_MSG(WARN,  ## __VA_ARGS__)
 #define INFO(...)  _ERR_MSG(INFO,  ## __VA_ARGS__)

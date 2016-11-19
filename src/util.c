@@ -1,5 +1,12 @@
+#include <time.h>
 #include "util.h"
 #include "log.h"
+
+uint64_t nanos(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return ts.tv_sec * (1000 * 1000 * 1000) + ts.tv_nsec;
+}
 
 static const char * strchrnul(const char * str, int c) {
     if (str == NULL) return NULL;

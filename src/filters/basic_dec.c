@@ -11,7 +11,7 @@ int eth_dec_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
     for (AG_EACH_EDGEOUT(node, edge)) {
         int type = ln_pkt_eth_parse_type(agget(edge, "ethertype"));
         if (type < 0 || (int) eth->eth_type == type)
-            rc |= ln_filter_push(edge, &eth->eth_pkt);
+            rc += ln_filter_push(edge, &eth->eth_pkt);
     }
 
     ln_pkt_decref(&eth->eth_pkt);
@@ -28,10 +28,8 @@ int ipv4_dec_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
     for (AG_EACH_EDGEOUT(node, edge)) {
         int proto = ln_pkt_ipv4_parse_proto(agget(edge, "proto"));
         if (proto < 0 || (int) ipv4->ipv4_proto == proto)
-            rc |= ln_filter_push(edge, &ipv4->ipv4_pkt);
+            rc += ln_filter_push(edge, &ipv4->ipv4_pkt);
     }
-
-    ln_pkt_decref(&ipv4->ipv4_pkt);
     return rc;
 }
 LN_FILTER_TYPE_DECLARE_STATELESS(ipv4_dec)
@@ -42,7 +40,6 @@ int udp_dec_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
     if (udp == NULL) return -1;
 
     int rc = 0; 
-    int match_count = 0;
     Agedge_t * unmatched = NULL;
 
     for (AG_EACH_EDGEOUT(node, edge)) {
@@ -61,16 +58,13 @@ int udp_dec_perform(Agnode_t * node, void * filter, struct ln_pkt * pkt) {
         is_match |= port >= 0 && port == (int) udp->udp_dst;
         is_match |= port >= 0 && port == (int) udp->udp_src;
 
-        if (is_match) {
-            rc |= ln_filter_push(edge, &udp->udp_pkt);
-            match_count++;
-        }
-    }
-    if (match_count == 0 && unmatched != NULL) {
-        rc |= ln_filter_push(unmatched, &udp->udp_pkt);
-    }
+        if (!is_match) continue;
 
-    ln_pkt_decref(&udp->udp_pkt);
+        rc += ln_filter_push(edge, &udp->udp_pkt);
+    }
+    if (rc == 0 && unmatched != NULL) {
+        rc += ln_filter_push(unmatched, &udp->udp_pkt);
+    }
     return rc;
 }
 LN_FILTER_TYPE_DECLARE_STATELESS(udp_dec)
