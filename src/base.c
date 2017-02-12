@@ -86,6 +86,94 @@ int ln_data_fdump(struct ln_data * data, FILE * stream) {
     return fhexdump(stream, data->data_pos, data->data_last - data->data_pos);
 }
 
+//
+
+struct ln_fq {
+    char * fq_buf;
+    char * fq_end;
+    char * fq_r_pos;
+    char * fq_w_pos;
+    bool fq_w_closed;
+    bool fq_r_closed;
+};
+
+#define LN_FQ_DEFAULT_SIZE 1024
+
+static ssize_t ln_fq_reader_read(void * cookie, char * buf, size_t size) {
+    struct ln_fq * fq = cookie;
+    if (fq->fq_r_pos == fq->fq_w_pos)
+        return 0;
+    ssize_t rc = fq->fq_w_pos - fq->fq_r_pos;
+    ASSERT(rc > 0);
+    if ((size_t) rc > size)
+        rc = size;
+    memcpy(buf, fq->fq_r_pos, rc);
+    fq->fq_r_pos += rc;
+    return rc;
+}
+
+static ssize_t ln_fq_writer_write(void * cookie, const char * buf, size_t size) {
+    struct ln_fq * fq = cookie;
+    if (fq->fq_w_pos + size >= fq->fq_end) {
+        size_t new_size = fq->fq_end - fq->fq_buf; 
+        while(fq->fq_w_pos + size >= fq->fq_buf + new_size)
+            new_size *= 2;
+        void * new_buf = realloc(fq->fq_buf, new_size);
+        if (new_buf == NULL)
+            return -1;
+        fq->fq_buf = new_buf;
+    }
+    memcpy(fq->fq_w_pos, buf, size);
+    return size;
+}
+
+static int ln_fq_reader_close(void * cookie) {
+    struct ln_fq * fq = cookie;
+    fq->fq_r_closed = true;
+    if (fq->fq_r_closed && fq->fq_w_closed) {
+        free(fq->fq_buf);
+        free(fq);
+    }
+    return 0;
+}
+
+static int ln_fq_writer_close(void * cookie) {
+    struct ln_fq * fq = cookie;
+    fq->fq_w_closed = true;
+    if (fq->fq_r_closed && fq->fq_w_closed) {
+        free(fq->fq_buf);
+        free(fq);
+    }
+    return 0;
+}
+
+cookie_io_functions_t ln_fq_reader = {
+    .read = ln_fq_reader_read,
+    //.seek = ln_fq_reader_seek,
+    .close = ln_fq_reader_close,
+};
+
+cookie_io_functions_t ln_fq_writer = {
+    .write = ln_fq_writer_write,
+    //.seek = ln_fq_writer_seek,
+    .close = ln_fq_writer_close,
+};
+
+int ln_fq_create(FILE ** reader, FILE ** writer) {
+    struct ln_fq * fq = calloc(1, sizeof *fq);
+    if (fq == NULL) MEMFAIL();
+    fq->fq_buf = calloc(1, LN_FQ_DEFAULT_SIZE);
+    if (fq->fq_buf == NULL) MEMFAIL();
+
+    *reader = fopencookie(fq, "r", ln_fq_reader);
+    *writer = fopencookie(fq, "w", ln_fq_writer);
+    if (*reader == NULL || *writer == NULL)
+        return -1;
+    return 0;
+}
+
+//
+
 int fhexdump(FILE * stream, uchar * buf, size_t len) {
     const size_t width = 16;
     int outlen = 0;

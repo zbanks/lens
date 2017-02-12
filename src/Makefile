@@ -16,8 +16,9 @@ INC = -I. -I/usr/include/libusb-1.0/
 CFLAGS = -std=gnu99 -ggdb3 -Og -rdynamic
 CFLAGS += $(INC)
 CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter
-CFLAGS += -D_POSIX_C_SOURCE=20160619
+CFLAGS += -D_POSIX_C_SOURCE=201702 -D_GNU_SOURCE
 LFLAGS = -L /usr/lib -lcgraph -lusb-1.0
+LFLAGS = -L /usr/lib -lcgraph
 
 # File dependency generation
 DEPDIR = .deps

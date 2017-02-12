@@ -37,6 +37,8 @@ ssize_t ln_data_write(struct ln_data ** base, const uchar * buf, size_t len); //
 ssize_t ln_data_extend(struct ln_data ** base, const struct ln_data * data); // Returns total length
 int ln_data_fdump(struct ln_data * data, FILE * stream);
 
+int ln_fqueue_create(FILE ** reader, FILE ** writer);
+
 // Utils
 
 #define LN_MIN(x, y) ((x) < (y) ? (x) : (y))
